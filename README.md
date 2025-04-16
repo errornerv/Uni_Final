@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 Network Traffic Problem Solve Using Blockchain
 
 Project Description
@@ -140,5 +140,5 @@ If you encounter any issues, please report them in the issues.txt file or via em
 
 License
 This project is licensed under the MIT License. See the LICENSE file for details (if available). All rights to this code belong to Ali Samadian.
-======>>>>>>> c562e1acbff69e440eeeb6e3eecd87db31c8839c=
+
 
