@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Network Traffic Dashboard</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script src="/static/script.js" defer></script>
+</head>
+<body>
+    <div class="header">
+        <button class="hamburger" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
+        <h1>Network Traffic Dashboard</h1>
+        <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
+    </div>
+
+    <div class="sidebar" id="sidebar">
+        <h3>Menu</h3>
+        <div class="menu-item" onclick="toggleSubMenu('run-project-sub')">
+            <i class="fas fa-play"></i> Run Project
+            <i class="fas fa-chevron-down" id="run-project-icon"></i>
+        </div>
+        <div class="sub-menu" id="run-project-sub">
+            <button onclick="runScript('init')">Run Project</button>
+            <button onclick="runScript('01')">Initial Data Script</button>
+            <button onclick="runScript('02')">Congestion Improved</button>
+            <button onclick="runScript('03')">Managed Traffic</button>
+            <button onclick="runScript('04')">New Orders</button>
+            <button onclick="runScript('05')">Real-Time Orders</button>
+            <button onclick="runScript('06')">Traffic Data Prep</button>
+            <button onclick="runScript('07')">Model Training</button>
+            <button onclick="runScript('08')">Advanced Traffic Report</button>
+            <button onclick="runScript('09')">Smart Traffic Management</button>
+            <button onclick="runScript('self_healing')">Self-Healing</button>
+        </div>
+
+        <div class="menu-item" onclick="toggleSubMenu('reports-sub')">
+            <i class="fas fa-file-alt"></i> Reports
+            <i class="fas fa-chevron-down" id="reports-icon"></i>
+        </div>
+        <div class="sub-menu" id="reports-sub">
+            <button onclick="window.location.href='/report/initial_data'">Initial Data</button>
+            <button onclick="window.location.href='/report/congestion'">Congestion</button>
+            <button onclick="window.location.href='/report/managed_traffic'">Managed Traffic</button>
+            <button onclick="window.location.href='/report/new_orders'">New Orders</button>
+            <button onclick="window.location.href='/report/real_time_orders'">Real-Time Orders</button>
+            <button onclick="window.location.href='/report/self_healing'">Self-Healing</button>
+            <button onclick="window.location.href='/report/smart_traffic'">Smart Traffic</button>
+            <button onclick="window.location.href='/report/traffic_report'">Traffic Report</button>
+        </div>
+
+        <div class="menu-item" onclick="toggleSubMenu('details-sub')">
+            <i class="fas fa-info-circle"></i> Project Details
+            <i class="fas fa-chevron-down" id="details-icon"></i>
+        </div>
+        <div class="sub-menu ltr-text" id="details-sub">
+            <p>Project Title: Solving Network Congestion Using Blockchain</p>
+            <p>This project includes the following steps:</p>
+            <ul>
+                <li>Database Initialization</li>
+                <li>Blockchain Example</li>
+                <li>Model Training</li>
+                <li>Generating Reports</li>
+                <li>Smart Monitoring and Self-Healing</li>
+            </ul>
+            <p>This project uses blockchain to ensure transparency and security of network traffic data...</p>
+        </div>
+    </div>
+
+    <div class="main-content" id="main-content">
+        <div id="output" class="output-container">
+            <div id="script-outputs"></div>
+        </div>
+
+        <div class="floating-toolbar">
+            <button id="stop-all-button" onclick="stopAllScripts()"><i class="fas fa-stop"></i> <span id="stop-button-text">Stop All Scripts</span></button>
+            <button id="clear-terminal-button" onclick="clearTerminal()"><i class="fas fa-trash-alt"></i> Clear Terminal</button>
+        </div>
+
+        <div id="loading">
+            <div class="spinner-border text-primary" role="status">
+                <span class="sr-only">Loading...</span>
+            </div>
+            <p>Please wait...</p>
+        </div>
+    </div>
+
+    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'926f2ae6cfdbbd3f',t:'MTc0MzA4MTQ0Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>

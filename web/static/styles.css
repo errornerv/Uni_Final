@@ -1,0 +1,370 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background: linear-gradient(135deg, #f0f2f5 0%, #e9ecef 100%);
+    color: #333;
+    overflow-x: hidden;
+}
+
+.header {
+    background: #1F2A44;
+    color: #fff;
+    padding: 15px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.header h1 {
+    font-size: 1.5rem;
+    margin: 0;
+}
+
+.header .theme-toggle {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.sidebar {
+    width: 250px;
+    background: #2C3E50;
+    color: #fff;
+    position: fixed;
+    top: 70px;
+    left: 0;
+    height: calc(100vh - 70px);
+    padding: 20px;
+    transition: transform 0.3s ease;
+    z-index: 999;
+}
+
+.sidebar.collapsed {
+    transform: translateX(-100%);
+}
+
+.sidebar h3 {
+    font-size: 1.2rem;
+    margin-bottom: 20px;
+}
+
+.sidebar .menu-item {
+    padding: 10px 15px;
+    margin-bottom: 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sidebar .menu-item:hover {
+    background: #34495E;
+}
+
+.sidebar .menu-item i {
+    font-size: 1.2rem;
+}
+
+.sidebar .sub-menu {
+    display: none;
+    padding-left: 20px;
+}
+
+.sidebar .sub-menu button {
+    width: 100%;
+    text-align: left;
+    background: #3A506B;
+    border: none;
+    padding: 8px;
+    margin: 5px 0;
+    border-radius: 5px;
+    color: #fff;
+    transition: background 0.3s;
+}
+
+.sidebar .sub-menu button:hover {
+    background: #4A6FA5;
+}
+
+.hamburger {
+    display: none;
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.main-content {
+    margin-left: 250px;
+    padding: 20px;
+    transition: margin-left 0.3s ease;
+}
+
+.main-content.full-width {
+    margin-left: 0;
+}
+
+.output-container {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.floating-toolbar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    z-index: 1000;
+}
+
+.floating-toolbar button {
+    background: #DC3545;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    color: #fff;
+    transition: background 0.3s;
+}
+
+.floating-toolbar button:hover {
+    background: #C82333;
+}
+
+.script-panel {
+    background: #f8f9fa;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+}
+
+.script-panel h4 {
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.script-panel .script-output {
+    display: block;
+    margin-top: 10px;
+}
+
+.script-toolbar {
+    display: flex;
+    gap: 10px;
+    position: sticky;
+    bottom: 0;
+    background: #f8f9fa;
+    padding-top: 10px;
+}
+
+.script-toolbar button {
+    background: #DC3545;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    color: #fff;
+    transition: background 0.3s;
+}
+
+.script-toolbar button:hover {
+    background: #C82333;
+}
+
+.card {
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.card h2 {
+    font-size: 1.3rem;
+    margin-bottom: 15px;
+}
+
+.card .btn {
+    margin: 5px;
+}
+
+body.report-page {
+    font-family: 'Arial', sans-serif;
+    background-color: #f0f0f0;
+    margin: 0;
+    padding: 20px;
+}
+
+.report-page h1 {
+    color: #333;
+}
+
+.table-container {
+    overflow-x: auto;
+    white-space: nowrap;
+    position: relative;
+    max-height: 600px;
+}
+
+.table {
+    margin: 0 auto;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.table th, .table td {
+    text-align: center;
+    vertical-align: middle;
+}
+
+.table th {
+    background-color: #007bff;
+    color: white;
+}
+
+.table td {
+    background-color: #f8f9fa;
+}
+
+.table tr:hover {
+    background-color: #e9ecef;
+}
+
+.table-container .btn {
+    margin: 5px;
+}
+
+.table-container .btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.table-container .btn-secondary {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.table-container .btn-primary:hover,
+.table-container .btn-secondary:hover {
+    opacity: 0.8;
+}
+
+#loading {
+    display: none;
+    text-align: center;
+    margin-top: 20px;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0, 0, 0, 0.7);
+    padding: 20px;
+    border-radius: 10px;
+    color: #fff;
+    z-index: 1000;
+}
+
+#loading .spinner-border {
+    width: 3rem;
+    height: 3rem;
+    border-width: 0.4em;
+    animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
+}
+
+#loading p {
+    margin-top: 10px;
+    font-size: 1.1rem;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .sidebar.collapsed {
+        transform: translateX(0);
+    }
+
+    .main-content {
+        margin-left: 0;
+    }
+
+    .main-content.full-width {
+        margin-left: 0;
+    }
+
+    .hamburger {
+        display: block;
+    }
+
+    .floating-toolbar {
+        justify-content: center;
+    }
+
+    .card .btn {
+        width: 100%;
+        margin: 5px 0;
+    }
+}
+
+body.dark-theme {
+    background: linear-gradient(135deg, #1F2A44 0%, #2C3E50 100%);
+    color: #fff;
+}
+
+body.dark-theme .header {
+    background: #141C2F;
+}
+
+body.dark-theme .sidebar {
+    background: #1F2A44;
+}
+
+body.dark-theme .sidebar .menu-item:hover {
+    background: #2C3E50;
+}
+
+body.dark-theme .output-container,
+body.dark-theme .card {
+    background: #2C3E50;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme .script-panel {
+    background: #34495E;
+}
