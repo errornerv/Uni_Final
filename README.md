@@ -6,5 +6,5 @@ Managing network traffic congestion using division into different nodes and load
 
 Requested by Professor Karimi.
 
-A web panel and a whole code written using Python, which includes a report and complete execution.
+A web panel using html css and js and a whole code written using Python, which includes a report and complete execution.
 All additional explanations and required items are inside the folder. Read.
