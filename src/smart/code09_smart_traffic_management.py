@@ -7,6 +7,7 @@ import sqlite3
 import json
 import logging
 import sys
+from utils.db_utils import init_db, save_to_db
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)

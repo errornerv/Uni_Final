@@ -11,6 +11,7 @@ import sqlite3
 import random
 from tqdm import tqdm
 import sys
+from utils.db_utils import init_db, save_to_dbS
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)

@@ -1,0 +1,29 @@
+In web
+Update script_map in app.py:
+
+Verify that all script paths in src are correct and reflect any changes made during refactoring.
+Add any new scripts introduced in src to the script_map.
+Enhance /report/<report_type>:
+
+Ensure that the report_map in app.py includes all new database tables or report types created in src.
+Update the report.html template to handle any new columns or data formats.
+Test Real-Time Output Handling:
+
+Test the socket.on('script_output') handler in script.js to ensure it correctly displays outputs from all updated scripts in src.
+UI Updates for New Features:
+
+Add buttons or menu items in index.html for any new scripts or features introduced in src.
+In src
+Database Schema Consistency:
+
+Ensure that all database schemas are finalized and consistent across all scripts.
+Document any schema changes so they can be reflected in the web panel.
+Standardize Script Outputs:
+
+Ensure all scripts produce outputs in a consistent format (e.g., JSON or plain text) so the web panel can process them uniformly.
+Error Propagation:
+
+Ensure that all scripts propagate meaningful error messages to the web panel via stderr or structured logs.
+Testing and Integration:
+
+Test all scripts individually and in combination with the web panel to ensure seamless integration.
