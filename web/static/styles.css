@@ -497,3 +497,201 @@ body.dark-theme .filter-section select:focus {
         grid-template-columns: 1fr;
     }
 }
+
+/* استایل‌های جدید برای فرم Add New Order */
+#add-order-form .card {
+    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+    border: 1px solid #e0e0e0;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 25px;
+    transition: all 0.3s ease;
+}
+
+#add-order-form .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+}
+
+#add-order-form .card h3 {
+    font-size: 1.4rem;
+    color: #1F2A44;
+    margin-bottom: 20px;
+    text-align: center;
+    font-weight: 600;
+}
+
+#add-order-form .form-group {
+    margin-bottom: 20px;
+}
+
+#add-order-form .form-group label {
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: #333;
+    margin-bottom: 8px;
+    display: block;
+}
+
+#add-order-form .form-group select,
+#add-order-form .form-group input {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+    font-size: 0.95rem;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+}
+
+#add-order-form .form-group select:focus,
+#add-order-form .form-group input:focus {
+    outline: none;
+    border-color: #4BC0C0;
+    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
+    background: #fff;
+}
+
+#add-order-form .form-group select:hover,
+#add-order-form .form-group input:hover {
+    border-color: #4BC0C0;
+}
+
+#add-order-form .btn-primary {
+    background: #4BC0C0;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #fff;
+    display: block;
+    width: 100%;
+    transition: all 0.3s ease;
+}
+
+#add-order-form .btn-primary:hover {
+    background: #36A2EB;
+    transform: scale(1.02);
+}
+
+#form-message {
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 500;
+    padding: 8px;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+#form-message span[style*="color: green"] {
+    background: rgba(40, 167, 69, 0.1);
+    color: #28a745;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+#form-message span[style*="color: red"] {
+    background: rgba(220, 53, 69, 0.1);
+    color: #dc3545;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+#form-message span[style*="color: blue"] {
+    background: rgba(54, 162, 235, 0.1);
+    color: #36A2EB;
+    padding: 5px 10px;
+    border-radius: 4px;
+}
+
+/* حالت دارک برای فرم */
+body.dark-theme #add-order-form .card {
+    background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
+    border: 1px solid #4A6FA5;
+    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
+}
+
+body.dark-theme #add-order-form .card h3 {
+    color: #E6F0FA;
+}
+
+body.dark-theme #add-order-form .form-group label {
+    color: #E6F0FA;
+}
+
+body.dark-theme #add-order-form .form-group select,
+body.dark-theme #add-order-form .form-group input {
+    background: #34495E;
+    color: #E6F0FA;
+    border-color: #4A6FA5;
+}
+
+body.dark-theme #add-order-form .form-group select:focus,
+body.dark-theme #add-order-form .form-group input:focus {
+    border-color: #4BC0C0;
+    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
+    background: #3A506B;
+}
+
+body.dark-theme #add-order-form .form-group select:hover,
+body.dark-theme #add-order-form .form-group input:hover {
+    border-color: #4BC0C0;
+}
+
+body.dark-theme #add-order-form .btn-primary {
+    background: #4BC0C0;
+}
+
+body.dark-theme #add-order-form .btn-primary:hover {
+    background: #36A2EB;
+}
+
+/* استایل‌های جدید برای دکمه Add New Order در هدر */
+header .add-order-toggle {
+    background: #4BC0C0;
+    border: none;
+    padding: 8px 15px;
+    border-radius: 5px;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+header .add-order-toggle:hover {
+    background: #36A2EB;
+    transform: scale(1.05);
+}
+
+header .add-order-toggle i {
+    font-size: 1.1rem;
+}
+
+/* انیمیشن برای باز و بسته شدن فرم */
+#add-order-section {
+    opacity: 0;
+    max-height: 0;
+    overflow: hidden;
+    transition: opacity 0.5s ease, max-height 0.5s ease;
+}
+
+#add-order-section.show {
+    opacity: 1;
+    max-height: 1000px; /* افزایش max-height برای اطمینان از نمایش کامل فرم */
+    overflow: visible; /* تغییر overflow به visible برای نمایش کامل محتوا */
+}
+
+/* حالت دارک برای دکمه */
+body.dark-theme header .add-order-toggle {
+    background: #4BC0C0;
+}
+
+body.dark-theme header .add-order-toggle:hover {
+    background: #36A2EB;
+}

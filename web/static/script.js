@@ -183,6 +183,66 @@ $('#node-filter, #type-filter, #time-filter').on('change', function() {
     fetchTrafficData();
 });
 
+// Handle form submission for adding new order
+$('#add-order-form').on('submit', function(e) {
+    e.preventDefault();
+    const formData = {
+        node_id: $('#order_node_id').val(),
+        traffic_type: $('#order_traffic_type').val(),
+        traffic_volume: $('#order_traffic_volume').val(),
+        network_health: $('#order_network_health').val(),
+        latency: $('#order_latency').val()
+    };
+
+    // Basic client-side validation
+    if (!formData.node_id || !formData.traffic_type || !formData.traffic_volume || !formData.network_health || !formData.latency) {
+        $('#form-message').html('<span style="color: red;">Please fill in all fields.</span>');
+        return;
+    }
+
+    if (formData.traffic_volume < 0 || formData.latency < 0) {
+        $('#form-message').html('<span style="color: red;">Traffic volume and latency must be positive numbers.</span>');
+        return;
+    }
+
+    $('#form-message').html('<span style="color: blue;">Adding order...</span>');
+    showLoading();
+
+    $.ajax({
+        url: '/add_new_order',
+        type: 'POST',
+        data: formData,
+        success: function(data) {
+            hideLoading();
+            if (data.error) {
+                $('#form-message').html('<span style="color: red;">Error: ' + data.error + '</span>');
+                customLog('ERROR', 'Error adding new order: ' + data.error);
+            } else {
+                $('#form-message').html('<span style="color: green;">Order added successfully!</span>');
+                customLog('INFO', 'New order added successfully');
+                // Clear the form
+                $('#add-order-form')[0].reset();
+                // Refresh the charts to reflect the new data
+                fetchTrafficData();
+            }
+        },
+        error: function(xhr, status, error) {
+            hideLoading();
+            $('#form-message').html('<span style="color: red;">Failed to add order: ' + status + ', ' + error + '</span>');
+            customLog('ERROR', 'Failed to add new order: ' + status + ', ' + error);
+        }
+    });
+});
+
+// تابع برای باز و بسته کردن فرم
+function toggleAddOrderForm() {
+    console.log("toggleAddOrderForm called"); // برای دیباگ
+    const addOrderSection = $('#add-order-section');
+    console.log("addOrderSection:", addOrderSection); // برای دیباگ
+    addOrderSection.toggleClass('show');
+    console.log("show class after toggle:", addOrderSection.hasClass('show')); // برای دیباگ
+}
+
 function showLoading() {
     if (isScriptRunning) {
         $('#loading').show();
