@@ -136,7 +136,8 @@ Issues and Problems
 If you encounter any issues, please report them in the issues.txt file or via email/GitHub repository.
 
 License
-This project is licensed under the Apache License 2.0. Created by Ali Samadian.
+This project is licensed under the Apache License 2.0. See the NOTICE file for copyright and attribution details. Created by Ali Samadian.
+
 
 
 
