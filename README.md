@@ -12,9 +12,6 @@ text
 Copy
 NETWORK TRAFFIC PROBLEM SOLVE USING BLOCKCHAIN/
 ├── venv/                    # Python virtual environment
-├── docs/                    # Project documentation
-│   ├── documents.docx
-│   └── documents.pdf
 ├── result/                  # Databases and output files
 │   ├── congestion_data.db
 │   ├── congestion_data.db-journal
@@ -139,6 +136,7 @@ Issues and Problems
 If you encounter any issues, please report them in the issues.txt file or via email/GitHub repository.
 
 License
-This project is licensed under the MIT License. See the LICENSE file for details (if available). All rights to this code belong to Ali Samadian.
+This project is licensed under the Apache License 2.0. Created by Ali Samadian.
+
 
 
