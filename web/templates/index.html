@@ -4,93 +4,119 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Network Traffic Dashboard</title>
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
-    <script src="/static/script.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <div class="header">
-        <button class="hamburger" onclick="toggleSidebar()"><i class="fas fa-bars"></i></button>
-        <h1>Network Traffic Dashboard</h1>
-        <button class="theme-toggle" onclick="toggleTheme()"><i class="fas fa-moon"></i></button>
-    </div>
-
-    <div class="sidebar" id="sidebar">
-        <h3>Menu</h3>
-        <div class="menu-item" onclick="toggleSubMenu('run-project-sub')">
-            <i class="fas fa-play"></i> Run Project
-            <i class="fas fa-chevron-down" id="run-project-icon"></i>
-        </div>
-        <div class="sub-menu" id="run-project-sub">
-            <button onclick="runScript('init')">Run Project</button>
-            <button onclick="runScript('01')">Initial Data Script</button>
-            <button onclick="runScript('02')">Congestion Improved</button>
-            <button onclick="runScript('03')">Managed Traffic</button>
-            <button onclick="runScript('04')">New Orders</button>
-            <button onclick="runScript('05')">Real-Time Orders</button>
-            <button onclick="runScript('06')">Traffic Data Prep</button>
-            <button onclick="runScript('07')">Model Training</button>
-            <button onclick="runScript('08')">Advanced Traffic Report</button>
-            <button onclick="runScript('09')">Smart Traffic Management</button>
-            <button onclick="runScript('self_healing')">Self-Healing</button>
-        </div>
-
-        <div class="menu-item" onclick="toggleSubMenu('reports-sub')">
-            <i class="fas fa-file-alt"></i> Reports
-            <i class="fas fa-chevron-down" id="reports-icon"></i>
-        </div>
-        <div class="sub-menu" id="reports-sub">
-            <button onclick="window.location.href='/report/initial_data'">Initial Data</button>
-            <button onclick="window.location.href='/report/congestion'">Congestion</button>
-            <button onclick="window.location.href='/report/managed_traffic'">Managed Traffic</button>
-            <button onclick="window.location.href='/report/new_orders'">New Orders</button>
-            <button onclick="window.location.href='/report/real_time_orders'">Real-Time Orders</button>
-            <button onclick="window.location.href='/report/self_healing'">Self-Healing</button>
-            <button onclick="window.location.href='/report/smart_traffic'">Smart Traffic</button>
-            <button onclick="window.location.href='/report/traffic_report'">Traffic Report</button>
-        </div>
-
-        <div class="menu-item" onclick="toggleSubMenu('details-sub')">
-            <i class="fas fa-info-circle"></i> Project Details
-            <i class="fas fa-chevron-down" id="details-icon"></i>
-        </div>
-        <div class="sub-menu ltr-text" id="details-sub">
-            <p>Project Title: Solving Network Congestion Using Blockchain</p>
-            <p>This project includes the following steps:</p>
+    <div id="main-content" class="main-content">
+        <header>
+            <button onclick="toggleSidebar()" class="sidebar-toggle"><i class="fas fa-bars"></i></button>
+            <h1>Network Traffic Dashboard</h1>
+            <button onclick="toggleTheme()" class="theme-toggle"><i class="fas fa-moon"></i></button>
+        </header>
+        <div id="sidebar" class="sidebar">
+            <h2>Menu</h2>
             <ul>
-                <li>Database Initialization</li>
-                <li>Blockchain Example</li>
-                <li>Model Training</li>
-                <li>Generating Reports</li>
-                <li>Smart Monitoring and Self-Healing</li>
+                <li><a href="#" class="menu-item" onclick="toggleSubMenu('run-menu')"><i class="fas fa-play"></i> Run Project <i id="run-menu-icon" class="fas fa-chevron-down"></i></a>
+                    <ul id="run-menu" class="sub-menu">
+                        <li><a href="#" onclick="runScript('01')">Initial Data</a></li>
+                        <li><a href="#" onclick="runScript('02')">Congestion</a></li>
+                        <li><a href="#" onclick="runScript('03')">Managed Traffic</a></li>
+                        <li><a href="#" onclick="runScript('04')">New Orders</a></li>
+                        <li><a href="#" onclick="runScript('05')">Real-Time Orders</a></li>
+                        <li><a href="#" onclick="runScript('06')">Traffic Data Preparation</a></li>
+                        <li><a href="#" onclick="runScript('07')">Model Training</a></li>
+                        <li><a href="#" onclick="runScript('08')">Advanced Traffic Report</a></li>
+                        <li><a href="#" onclick="runScript('09')">Smart Traffic Management</a></li>
+                        <li><a href="#" onclick="runScript('self_healing')">Self-Healing Network</a></li>
+                        <li><a href="#" onclick="runScript('init')">Initialize</a></li>
+                    </ul>
+                </li>
+                <li><a href="#" class="menu-item" onclick="toggleSubMenu('report-menu')"><i class="fas fa-file-alt"></i> Reports <i id="report-menu-icon" class="fas fa-chevron-down"></i></a>
+                    <ul id="report-menu" class="sub-menu">
+                        <li><a href="/report/initial_data">Initial Data</a></li>
+                        <li><a href="/report/congestion">Congestion</a></li>
+                        <li><a href="/report/managed_traffic">Managed Traffic</a></li>
+                        <li><a href="/report/new_orders">New Orders</a></li>
+                        <li><a href="/report/real_time_orders">Real-Time Orders</a></li>
+                        <li><a href="/report/self_healing">Self-Healing Network</a></li>
+                        <li><a href="/report/smart_traffic">Smart Traffic</a></li>
+                        <li><a href="/report/traffic_report">Traffic Report</a></li>
+                    </ul>
+                </li>
+                <li><a href="#" class="menu-item" onclick="toggleSubMenu('details-menu')"><i class="fas fa-info-circle"></i> Project Details <i id="details-menu-icon" class="fas fa-chevron-down"></i></a>
+                    <ul id="details-menu" class="sub-menu">
+                        <li>
+                            <p>This dashboard monitors network traffic in real-time, providing insights into traffic volume, network health, latency, and traffic type distribution. It supports blockchain-based traffic management and self-healing networks.</p>
+                        </li>
+                    </ul>
+                </li>
             </ul>
-            <p>This project uses blockchain to ensure transparency and security of network traffic data...</p>
         </div>
-    </div>
-
-    <div class="main-content" id="main-content">
-        <div id="output" class="output-container">
-            <div id="script-outputs"></div>
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading...</p>
         </div>
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <label for="node-filter">Node ID:</label>
+            <select id="node-filter">
+                <option value="">All Nodes</option>
+                <option value="Node_1">Node 1</option>
+                <option value="Node_2">Node 2</option>
+                <option value="Node_3">Node 3</option>
+                <option value="Node_4">Node 4</option>
+                <option value="Node_5">Node 5</option>
+                <option value="Node_6">Node 6</option>
+                <option value="Node_7">Node 7</option>
+                <option value="Node_8">Node 8</option>
+                <option value="Node_9">Node 9</option>
+            </select>
 
-        <div class="floating-toolbar">
-            <button id="stop-all-button" onclick="stopAllScripts()"><i class="fas fa-stop"></i> <span id="stop-button-text">Stop All Scripts</span></button>
-            <button id="clear-terminal-button" onclick="clearTerminal()"><i class="fas fa-trash-alt"></i> Clear Terminal</button>
+            <label for="type-filter">Traffic Type:</label>
+            <select id="type-filter">
+                <option value="">All Types</option>
+                <option value="data">Data</option>
+                <option value="video">Video</option>
+                <option value="audio">Audio</option>
+            </select>
+
+            <label for="time-filter">Time Range:</label>
+            <select id="time-filter">
+                <option value="">All Time</option>
+                <option value="1m">Last 1 Minute</option>
+                <option value="5m">Last 5 Minutes</option>
+            </select>
         </div>
-
-        <div id="loading">
-            <div class="spinner-border text-primary" role="status">
-                <span class="sr-only">Loading...</span>
+        <!-- Charts Section -->
+        <div class="dashboard-grid">
+            <div class="chart-card">
+                <h3>Traffic Volume (MB/s)</h3>
+                <canvas id="trafficChart" width="300" height="150"></canvas>
             </div>
-            <p>Please wait...</p>
+            <div class="chart-card">
+                <h3>Network Health</h3>
+                <canvas id="healthChart" width="300" height="150"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Latency (ms)</h3>
+                <canvas id="latencyChart" width="300" height="150"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Traffic Type Distribution</h3>
+                <canvas id="typeChart" width="300" height="150"></canvas>
+            </div>
+        </div>
+        <div id="script-outputs"></div>
+        <div class="floating-toolbar">
+            <button onclick="stopAllScripts()"><i class="fas fa-stop"></i> <span id="stop-button-text">Stop All Scripts</span></button>
+            <button onclick="clearTerminal()"><i class="fas fa-trash-alt"></i> Clear Terminal</button>
         </div>
     </div>
-
-    <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'926f2ae6cfdbbd3f',t:'MTc0MzA4MTQ0Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934f7fc7cfefe58e',t:'MTc0NTQzMzcyOS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
