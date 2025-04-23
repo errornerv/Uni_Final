@@ -138,10 +138,12 @@ header .theme-toggle:hover {
     margin-left: 250px;
     padding: 20px;
     transition: margin-left 0.3s ease;
+    width: calc(100% - 250px); /* تنظیم عرض با در نظر گرفتن سایدبار */
 }
 
 .main-content.full-width {
     margin-left: 0;
+    width: 100%; /* وقتی سایدبار بسته است، عرض کامل */
 }
 
 .filter-section {
@@ -151,30 +153,57 @@ header .theme-toggle:hover {
     margin-bottom: 20px;
     align-items: center;
     background: #fff;
-    padding: 10px 15px;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.5s ease-in-out;
+    border: 1px solid #e0e0e0;
+    width: 100%;
+    max-width: 1000px; /* افزایش عرض برای پر کردن فضای خالی */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .filter-section label {
     font-weight: 600;
-    font-size: 0.9rem;
-    color: #333;
+    font-size: 0.95rem;
+    color: #1F2A44;
+    margin-right: 5px;
 }
 
 .filter-section select {
-    padding: 6px 10px;
-    border-radius: 5px;
+    padding: 8px 12px;
+    border-radius: 6px;
     border: 1px solid #ccc;
     font-size: 0.9rem;
-    background: #f8f9fa;
-    transition: border-color 0.3s ease;
+    background: #f9fafb;
+    transition: all 0.3s ease;
+    min-width: 120px;
+}
+
+.filter-section select:hover {
+    border-color: #4BC0C0;
 }
 
 .filter-section select:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 5px rgba(0, 123, 255, 0.3);
+    border-color: #4BC0C0;
+    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
+    background: #fff;
+}
+
+.filter-section .btn-primary {
+    background: #4BC0C0;
+    border: none;
+    padding: 8px 20px;
+    border-radius: 6px;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.filter-section .btn-primary:hover {
+    background: #36A2EB;
+    transform: scale(1.05);
 }
 
 .output-container {
@@ -284,10 +313,24 @@ body.report-page {
     background-color: #f0f0f0;
     margin: 0;
     padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 .report-page h1 {
-    color: #333;
+    color: #1F2A44;
+    animation: slideInDown 0.5s ease-in-out;
+}
+
+.text-center.mb-4 {
+    width: 100%;
+    max-width: 1000px; /* افزایش عرض برای هماهنگی با جدول */
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .table-container {
@@ -295,30 +338,47 @@ body.report-page {
     white-space: nowrap;
     position: relative;
     max-height: 600px;
+    width: 100%;
+    max-width: 1000px; /* افزایش عرض جدول برای پر کردن فضای خالی */
+    margin: 0 auto;
+    animation: slideInUp 0.5s ease-in-out;
+    display: flex;
+    justify-content: center;
 }
 
 .table {
-    margin: 0 auto;
     width: 100%;
-    max-width: 1000px;
+    border-collapse: collapse;
+    table-layout: auto;
 }
 
 .table th, .table td {
     text-align: center;
     vertical-align: middle;
+    padding: 8px;
+    font-size: 0.9rem;
+    max-width: 180px; /* افزایش عرض ستون‌ها برای خوانایی بهتر */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .table th {
-    background-color: #007bff;
+    background-color: #1F2A44;
     color: white;
+    position: sticky;
+    top: 0;
+    z-index: 10;
 }
 
 .table td {
     background-color: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
 }
 
 .table tr:hover {
     background-color: #e9ecef;
+    transition: background-color 0.3s ease;
 }
 
 .table-container .btn {
@@ -326,8 +386,8 @@ body.report-page {
 }
 
 .table-container .btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
+    background-color: #4BC0C0;
+    border-color: #4BC0C0;
 }
 
 .table-container .btn-secondary {
@@ -338,6 +398,7 @@ body.report-page {
 .table-container .btn-primary:hover,
 .table-container .btn-secondary:hover {
     opacity: 0.8;
+    transform: scale(1.05);
 }
 
 #loading {
@@ -376,6 +437,21 @@ body.report-page {
     0% { opacity: 1; }
     50% { opacity: 0.5; }
     100% { opacity: 1; }
+}
+
+@keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes slideInDown {
+    0% { transform: translateY(-20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes slideInUp {
+    0% { transform: translateY(20px); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
 }
 
 .dashboard-grid {
@@ -436,22 +512,53 @@ body.dark-theme .script-panel {
 
 body.dark-theme .filter-section {
     background: #2C3E50;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    border: 1px solid #4A6FA5;
 }
 
 body.dark-theme .filter-section label {
-    color: #fff;
+    color: #E6F0FA;
 }
 
 body.dark-theme .filter-section select {
     background: #34495E;
-    color: #fff;
+    color: #E6F0FA;
     border-color: #4A6FA5;
 }
 
+body.dark-theme .filter-section select:hover {
+    border-color: #4BC0C0;
+}
+
 body.dark-theme .filter-section select:focus {
-    border-color: #4A6FA5;
-    box-shadow: 0 0 5px rgba(74, 111, 165, 0.5);
+    border-color: #4BC0C0;
+    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
+    background: #3A506B;
+}
+
+body.dark-theme .filter-section .btn-primary {
+    background: #4BC0C0;
+}
+
+body.dark-theme .filter-section .btn-primary:hover {
+    background: #36A2EB;
+}
+
+body.dark-theme .report-page h1 {
+    color: #E6F0FA;
+}
+
+body.dark-theme .table th {
+    background-color: #2C3E50;
+}
+
+body.dark-theme .table td {
+    background-color: #34495E;
+    border-bottom: 1px solid #4A6FA5;
+}
+
+body.dark-theme .table tr:hover {
+    background-color: #4A6FA5;
 }
 
 @media (max-width: 768px) {
@@ -465,10 +572,12 @@ body.dark-theme .filter-section select:focus {
 
     .main-content {
         margin-left: 0;
+        width: 100%;
     }
 
     .main-content.full-width {
         margin-left: 0;
+        width: 100%;
     }
 
     .hamburger {
@@ -487,14 +596,36 @@ body.dark-theme .filter-section select:focus {
     .filter-section {
         flex-direction: column;
         align-items: stretch;
+        max-width: 100%;
+        padding: 10px;
     }
 
     .filter-section select {
+        width: 100%;
+        margin-bottom: 10px;
+        min-width: unset;
+    }
+
+    .filter-section label {
+        margin-right: 0;
+    }
+
+    .filter-section .btn-primary {
         width: 100%;
     }
 
     .dashboard-grid {
         grid-template-columns: 1fr;
+    }
+
+    .table-container {
+        max-width: 100%;
+    }
+
+    .table th, .table td {
+        font-size: 0.8rem;
+        padding: 6px;
+        max-width: 100px;
     }
 }
 
@@ -683,8 +814,8 @@ header .add-order-toggle i {
 
 #add-order-section.show {
     opacity: 1;
-    max-height: 1000px; /* افزایش max-height برای اطمینان از نمایش کامل فرم */
-    overflow: visible; /* تغییر overflow به visible برای نمایش کامل محتوا */
+    max-height: 1000px;
+    overflow: visible;
 }
 
 /* حالت دارک برای دکمه */

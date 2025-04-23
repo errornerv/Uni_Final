@@ -16,8 +16,52 @@
     <div class="text-center mb-4">
         <a href="/" class="btn btn-primary"><i class="fas fa-home"></i> Back to Dashboard</a>
     </div>
+    <!-- بخش فیلتر کردن گزارش -->
+    <div class="filter-section mb-4">
+        <label for="report-node-filter">Node ID:</label>
+        <select id="report-node-filter">
+            <option value="">All Nodes</option>
+            <option value="Node_1">Node 1</option>
+            <option value="Node_2">Node 2</option>
+            <option value="Node_3">Node 3</option>
+            <option value="Node_4">Node 4</option>
+            <option value="Node_5">Node 5</option>
+            <option value="Node_6">Node 6</option>
+            <option value="Node_7">Node 7</option>
+            <option value="Node_8">Node 8</option>
+            <option value="Node_9">Node 9</option>
+            <option value="Node_10">Node 10</option>
+        </select>
+
+        <label for="report-type-filter">Traffic Type:</label>
+        <select id="report-type-filter">
+            <option value="">All Types</option>
+            <option value="Data">Data</option>
+            <option value="Stream">Stream</option>
+            <option value="Game">Game</option>
+        </select>
+
+        <label for="report-time-filter">Time Range:</label>
+        <select id="report-time-filter">
+            <option value="">All Time</option>
+            <option value="1h">Last 1 Hour</option>
+            <option value="24h">Last 24 Hours</option>
+            <option value="7d">Last 7 Days</option>
+        </select>
+
+        <label for="report-health-filter">Network Health:</label>
+        <select id="report-health-filter">
+            <option value="">All Statuses</option>
+            <option value="Normal">Normal</option>
+            <option value="Delayed">Delayed</option>
+            <option value="Down">Down</option>
+        </select>
+
+        <button onclick="fetchReportData()" class="btn btn-primary">Apply Filters</button>
+    </div>
+    <!-- جدول گزارش -->
     <div class="table-container mt-4">
-        <table class="table table-bordered">
+        <table class="table table-bordered" id="report-table">
             <thead class="thead-dark">
                 <tr>
                     {% for column in columns %}
@@ -25,7 +69,7 @@
                     {% endfor %}
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="report-table-body">
                 {% for row in rows %}
                 <tr>
                     {% for cell in row %}
@@ -37,5 +81,7 @@
         </table>
     </div>
     <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'926f2ae6fcbd6760',t:'MTc0MzA4MTQ0Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934fdf76985b3dcd',t:'MTc0NTQzNzY0OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'934fead448807ba2',t:'MTc0NTQzODExNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>

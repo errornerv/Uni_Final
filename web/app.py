@@ -108,7 +108,7 @@ def run_script():
                 env["PYTHONUNBUFFERED"] = "1"
 
                 process = subprocess.Popen(
-                    ['python', scriptinformath],
+                    ['python', script_path],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -263,17 +263,60 @@ def force_stop_script():
         logger.error(f"Error force stopping script {script_id}: {str(e)}")
         return jsonify({'error': str(e)})
 
-def fetch_data_from_db(db_name, table_name):
+def fetch_data_from_db(db_name, table_name, node_id='', traffic_type='', time_range='', network_health=''):
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     db_path = os.path.join(base_dir, 'result', db_name)
     try:
+        # Build the SQL query
+        query = f"SELECT * FROM {table_name}"
+        conditions = []
+        params = []
+
+        # Filter by node_id
+        if node_id:
+            conditions.append("node_id = ?")
+            params.append(node_id)
+
+        # Filter by traffic_type
+        if traffic_type:
+            conditions.append("traffic_type = ?")
+            params.append(traffic_type)
+
+        # Filter by time_range
+        if time_range:
+            now = datetime.now()
+            if time_range == '1h':
+                time_threshold = now - timedelta(hours=1)
+            elif time_range == '24h':
+                time_threshold = now - timedelta(hours=24)
+            elif time_range == '7d':
+                time_threshold = now - timedelta(days=7)
+            else:
+                time_threshold = None
+
+            if time_threshold:
+                conditions.append("timestamp >= ?")
+                params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
+
+        # Filter by network_health
+        if network_health:
+            conditions.append("network_health = ?")
+            params.append(network_health)
+
+        # Combine conditions
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY timestamp DESC"
+
+        # Execute the query
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute(f"SELECT * FROM {table_name}")
+        c.execute(query, params)
         rows = c.fetchall()
         columns = [description[0] for description in c.description]
         conn.close()
-        logger.debug(f"Fetched data from {db_name}, table {table_name}")
+        logger.debug(f"Fetched data from {db_name}, table {table_name} with filters - node_id: {node_id}, traffic_type: {traffic_type}, time_range: {time_range}, network_health: {network_health}")
         return rows, columns
     except sqlite3.Error as e:
         logger.error(f"Error fetching data from {db_name}, table {table_name}: {str(e)}")
@@ -298,7 +341,14 @@ def report(report_type):
 
     db_name, table_name = report_map.get(report_type, (None, None))
     if db_name and table_name:
-        rows, columns = fetch_data_from_db(db_name, table_name)
+        # Get filter parameters from the request
+        node_id = request.args.get('node_id', '')
+        traffic_type = request.args.get('traffic_type', '')
+        time_range = request.args.get('time_range', '')
+        network_health = request.args.get('network_health', '')
+
+        # Fetch data with filters
+        rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
         return render_template('report.html', rows=rows, columns=columns, report_type=report_type)
     else:
         logger.warning(f"Invalid report type: {report_type}")

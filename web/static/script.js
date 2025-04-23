@@ -243,6 +243,34 @@ function toggleAddOrderForm() {
     console.log("show class after toggle:", addOrderSection.hasClass('show')); // برای دیباگ
 }
 
+// تابع برای گرفتن و آپدیت داده‌های گزارش
+function fetchReportData() {
+    const nodeFilter = $('#report-node-filter').val();
+    const typeFilter = $('#report-type-filter').val();
+    const timeFilter = $('#report-time-filter').val();
+    const healthFilter = $('#report-health-filter').val();
+    const reportType = window.location.pathname.split('/').pop(); // گرفتن report_type از URL
+
+    $.get('/report/' + reportType, {
+        node_id: nodeFilter,
+        traffic_type: typeFilter,
+        time_range: timeFilter,
+        network_health: healthFilter
+    }, function(data) {
+        // داده‌ها رو از HTML رندرشده استخراج می‌کنیم
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(data, 'text/html');
+        const newTableBody = doc.querySelector('#report-table-body').innerHTML;
+
+        // آپدیت جدول با داده‌های جدید
+        $('#report-table-body').html(newTableBody);
+        customLog('INFO', 'Report data updated successfully');
+    }).fail(function(jqXHR, textStatus, errorThrown) {
+        customLog('ERROR', 'Failed to fetch report data: ' + textStatus + ', ' + errorThrown);
+        $('#report-table-body').html('<tr><td colspan="100">Error loading data. Please try again.</td></tr>');
+    });
+}
+
 function showLoading() {
     if (isScriptRunning) {
         $('#loading').show();
@@ -260,7 +288,7 @@ function createScriptOutputPanel(scriptId) {
         outputDiv.className = 'script-panel';
         outputDiv.id = `panel-${scriptId}`;
         outputDiv.innerHTML = `
-            <h4 onclick="toggleOutput('${scriptId}')">Script: ${scriptId} <i class="fas fa-chevron-down" id="toggle-output-${scriptId}"></i></h4>
+            <h4 onclick="toggleOutput('${scriptId}')">Script: ${scriptId} <i class="fas fa-chevron-down" id="_toggle-output-${scriptId}"></i></h4>
             <pre id="output-${scriptId}" class="script-output bg-light p-3 border rounded" style="display: block;"></pre>
             <div id="link-${scriptId}" class="mt-2"></div>
             <div class="script-toolbar mt-2">
