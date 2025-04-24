@@ -7,6 +7,7 @@ module.exports = {
       },
       colors: {
         'dark-blue': '#1F2A44',
+        'header-dark': '#141C2F', // رنگ جدید برای هدر تو حالت شب
         'sidebar-bg': '#2C3E50',
         'sidebar-menu': '#3A506B',
         'sidebar-hover': '#4A6FA5',

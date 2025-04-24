@@ -482,7 +482,7 @@ function toggleTheme() {
         $('body').removeClass('bg-gradient-to-br from-light-bg to-light-gray text-text-dark');
         $('body').addClass('bg-gradient-to-br from-dark-blue to-sidebar-bg text-white');
         $('header').removeClass('bg-dark-blue');
-        $('header').addClass('bg-[#141C2F]');
+        $('header').addClass('bg-header-dark'); // استفاده از کلاس جدید
         $('.sidebar').removeClass('bg-sidebar-bg');
         $('.sidebar').addClass('bg-dark-blue');
         $('.menu-item').removeClass('bg-sidebar-menu hover:bg-sidebar-hover');
@@ -524,7 +524,7 @@ function toggleTheme() {
     } else {
         $('body').removeClass('bg-gradient-to-br from-dark-blue to-sidebar-bg text-white');
         $('body').addClass('bg-gradient-to-br from-light-bg to-light-gray text-text-dark');
-        $('header').removeClass('bg-[#141C2F]');
+        $('header').removeClass('bg-header-dark'); // حذف کلاس جدید
         $('header').addClass('bg-dark-blue');
         $('.sidebar').removeClass('bg-dark-blue');
         $('.sidebar').addClass('bg-sidebar-bg');
