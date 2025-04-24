@@ -1,764 +1,643 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
+import gevent
+from gevent import monkey
+monkey.patch_all()
+
+from flask import Flask, render_template, jsonify, request
 from flask_socketio import SocketIO
 import subprocess
-import os
 import sqlite3
-import psutil
-import random
-from datetime import datetime, timedelta
+from pathlib import Path
+import threading
 import logging
-import hashlib
-import json
-from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
+import os
 import pandas as pd
-import io
-from pathlib import Path  # اضافه کردن pathlib برای مدیریت مسیرها
 
-# تنظیم دایرکتوری static به صورت نسبی
-static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
-app = Flask(__name__, static_folder=static_path)
+app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+# تنظیمات لاگینگ
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-logger.info(f"Static folder set to: {app.static_folder}")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent  # به C:\Programming\Git-Hub\Uni_Final اشاره می‌کنه
+RESULT_DIR = ROOT_DIR / "result"
 
-styles_path = os.path.join(app.static_folder, 'styles.css')
-if os.path.exists(styles_path):
-    logger.info("styles.css found in static folder!")
-else:
-    logger.error("styles.css NOT found in static folder! Check the path.")
+# ایجاد دایرکتوری result اگر وجود ندارد
+if not RESULT_DIR.exists():
+    RESULT_DIR.mkdir()
 
-processes = {}
-stop_reading_flags = {}
+# لیست اسکریپت‌ها با مسیرهای اصلاح‌شده
+SCRIPTS = {
+    'code01': str(Path("src/blockchain/code01_blockchain_initial_data.py")),
+    'code02': str(Path("src/blockchain/code02_blockchain_congestion_improved.py")),
+    'code03': str(Path("src/blockchain/code03_blockchain_managed_traffic.py")),
+    'code04': str(Path("src/blockchain/code04_blockchain_with_new_orders.py")),
+    'code05': str(Path("src/blockchain/code05_blockchain_with_real_time_orders.py")),
+    'code06': str(Path("src/traffic/code06_traffic_data_preparation.py")),
+    'code07': str(Path("src/traffic/code07_model_training.py")),
+    'code08': str(Path("src/traffic/code08_advanced_traffic_report.py")),
+    'code09': str(Path("src/smart/code09_smart_traffic_management.py")),
+    'code10': str(Path("src/smart/code10_self_healing_network.py")),
+    'code11': str(Path("src/smart/code11_resource_optimization.py")),
+    'code12': str(Path("src/smart/code12_predictive_analysis_and_anomaly_detection.py"))
+}
 
-# گراف نودها
-nodes = [f"Node_{i}" for i in range(1, 11)]
-graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
-                "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
-         for node in nodes}
+# تابع برای اجرای اسکریپت و ارسال خروجی لایو
+def run_script(script_name, socketio):
+    script_path = ROOT_DIR / script_name
+    logging.info(f"Attempting to run script: {script_path}")
+    
+    if not script_path.exists():
+        logging.error(f"Script not found: {script_path}")
+        socketio.emit('output', f"Error: Script {script_name} not found")
+        return
+    
+    try:
+        process = subprocess.Popen(
+            ['python', str(script_path)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        while True:
+            stdout_line = process.stdout.readline()
+            stderr_line = process.stderr.readline()
+            
+            if stdout_line:
+                logging.info(f"Script output: {stdout_line.strip()}")
+                socketio.emit('output', stdout_line.strip())
+            if stderr_line:
+                logging.error(f"Script error: {stderr_line.strip()}")
+                socketio.emit('output', f"ERROR: {stderr_line.strip()}")
+            
+            if process.poll() is not None:
+                break
+        
+        socketio.emit('output', f"Script {script_name} execution completed")
+        logging.info(f"Script {script_name} execution completed")
+    except Exception as e:
+        logging.error(f"Error running script {script_name}: {e}")
+        socketio.emit('output', f"Error running {script_name}: {str(e)}")
 
-# مسیر دیتابیس‌ها با استفاده از pathlib
-base_dir = Path(__file__).resolve().parent.parent
-output_db = base_dir / 'result' / 'new_orders.db'
-real_time_db = base_dir / 'result' / 'real_time_orders.db'
-predictive_db = base_dir / 'result' / 'predictive_analysis.db'
-traffic_report_db = base_dir / 'result' / 'traffic_report.db'
+# تابع برای گرفتن گزارش‌ها از دیتابیس‌ها
+def get_reports(node_id='', traffic_type='', time_range='', network_health=''):
+    reports = {}
+    
+    # فیلترهای SQL
+    where_clauses = []
+    params = []
+    if node_id:
+        where_clauses.append("node_id = ?")
+        params.append(node_id)
+    if traffic_type:
+        where_clauses.append("traffic_type = ?")
+        params.append(traffic_type)
+    if network_health:
+        where_clauses.append("network_health = ?")
+        params.append(network_health)
+    if time_range:
+        if time_range == '24h':
+            where_clauses.append("timestamp >= datetime('now', '-1 day')")
+        elif time_range == '7d':
+            where_clauses.append("timestamp >= datetime('now', '-7 days')")
+        elif time_range == '30d':
+            where_clauses.append("timestamp >= datetime('now', '-30 days')")
+    
+    where_clause = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+    
+    # گزارش برای code01
+    try:
+        db_path = RESULT_DIR / "traffic_data.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM blocks {where_clause} AND traffic_volume > 70", params)
+            congested = c.fetchone()[0]
+            c.execute(f"SELECT AVG(traffic_volume) FROM blocks {where_clause}", params)
+            avg_traffic = c.fetchone()[0] or 0.0
+            c.execute(f"SELECT COUNT(*) FROM blocks {where_clause}", params)
+            total_blocks = c.fetchone()[0]
+            reports['code01'] = {
+                'total_blocks': total_blocks,
+                'congested_points': congested,
+                'avg_traffic': round(avg_traffic, 2)
+            }
+            conn.close()
+        else:
+            reports['code01'] = {'error': 'traffic_data.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading traffic_data.db: {e}")
+        reports['code01'] = {'error': str(e)}
+    
+    # گزارش برای code02
+    try:
+        db_path = RESULT_DIR / "congestion_data.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM congestion_blocks {where_clause} AND congestion_level = 'High'", params)
+            high_congestion = c.fetchone()[0]
+            c.execute(f"SELECT AVG(congestion_score) FROM congestion_blocks {where_clause}", params)
+            avg_score = c.fetchone()[0] or 0.0
+            reports['code02'] = {
+                'high_congestion': high_congestion,
+                'avg_congestion_score': round(avg_score, 2)
+            }
+            conn.close()
+        else:
+            reports['code02'] = {'error': 'congestion_data.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading congestion_data.db: {e}")
+        reports['code02'] = {'error': str(e)}
+    
+    # گزارش برای code03
+    try:
+        db_path = RESULT_DIR / "managed_traffic.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM managed_blocks {where_clause} AND congestion_level IN ('Medium', 'High')", params)
+            congested_blocks = c.fetchone()[0]
+            reports['code03'] = {'congested_blocks': congested_blocks}
+            conn.close()
+        else:
+            reports['code03'] = {'error': 'managed_traffic.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading managed_traffic.db: {e}")
+        reports['code03'] = {'error': str(e)}
+    
+    # گزارش برای code04
+    try:
+        db_path = RESULT_DIR / "new_orders.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM new_orders {where_clause} AND order_type = 'Priority'", params)
+            priority_orders = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM new_orders {where_clause} AND congestion_level IN ('Medium', 'High')", params)
+            total_congested = c.fetchone()[0]
+            reports['code04'] = {
+                'priority_orders': priority_orders,
+                'total_congested': total_congested
+            }
+            conn.close()
+        else:
+            reports['code04'] = {'error': 'new_orders.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading new_orders.db: {e}")
+        reports['code04'] = {'error': str(e)}
+    
+    # گزارش برای code05
+    try:
+        db_path = RESULT_DIR / "real_time_orders.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM real_time_orders {where_clause} AND order_type = 'Priority'", params)
+            priority_orders = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM real_time_orders {where_clause} AND congestion_level IN ('Medium', 'High')", params)
+            total_congested = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM real_time_orders {where_clause}", params)
+            total_blocks = c.fetchone()[0]
+            reports['code05'] = {
+                'total_blocks': total_blocks,
+                'priority_orders': priority_orders,
+                'total_congested': total_congested
+            }
+            conn.close()
+        else:
+            reports['code05'] = {'error': 'real_time_orders.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading real_time_orders.db: {e}")
+        reports['code05'] = {'error': str(e)}
+    
+    # گزارش برای code06
+    try:
+        csv_path = RESULT_DIR / "traffic_data.csv"
+        if csv_path.exists():
+            df = pd.read_csv(csv_path)
+            if node_id:
+                df = df[df['node_id'] == node_id]
+            if traffic_type:
+                df = df[df['traffic_type'] == traffic_type]
+            if time_range:
+                df['timestamp'] = pd.to_datetime(df['timestamp'])
+                if time_range == '24h':
+                    df = df[df['timestamp'] >= pd.Timestamp.now() - pd.Timedelta(days=1)]
+                elif time_range == '7d':
+                    df = df[df['timestamp'] >= pd.Timestamp.now() - pd.Timedelta(days=7)]
+                elif time_range == '30d':
+                    df = df[df['timestamp'] >= pd.Timestamp.now() - pd.Timedelta(days=30)]
+            reports['code06'] = {
+                'total_rows': len(df),
+                'avg_traffic_volume': round(df['traffic_volume'].mean(), 2) if 'traffic_volume' in df else 0.0
+            }
+        else:
+            reports['code06'] = {'error': 'traffic_data.csv not found'}
+    except Exception as e:
+        logging.error(f"Error reading traffic_data.csv: {e}")
+        reports['code06'] = {'error': str(e)}
+    
+    # گزارش برای code07
+    try:
+        model_path = RESULT_DIR / "congestion_model.pkl"
+        if model_path.exists():
+            reports['code07'] = {'status': 'Model trained successfully'}
+        else:
+            reports['code07'] = {'error': 'congestion_model.pkl not found'}
+    except Exception as e:
+        logging.error(f"Error checking congestion_model.pkl: {e}")
+        reports['code07'] = {'error': str(e)}
+    
+    # گزارش برای code08
+    try:
+        db_path = RESULT_DIR / "traffic_report.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT report_type, node_id, value, details FROM traffic_report {where_clause}", params)
+            traffic_reports = c.fetchall()
+            reports['code08'] = {
+                'daily_averages': [],
+                'health_impacts': [],
+                'high_traffic_nodes': []
+            }
+            for report_type, node_id, value, details in traffic_reports:
+                if report_type == 'daily_average':
+                    reports['code08']['daily_averages'].append({'node': node_id, 'value': round(value, 2)})
+                elif report_type == 'health_impact':
+                    reports['code08']['health_impacts'].append({'health': node_id, 'value': round(value, 2), 'details': details})
+                elif report_type == 'high_traffic':
+                    reports['code08']['high_traffic_nodes'].append(details)
+            conn.close()
+        else:
+            reports['code08'] = {'error': 'traffic_report.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading traffic_report.db: {e}")
+        reports['code08'] = {'error': str(e)}
+    
+    # گزارش برای code09
+    try:
+        db_path = RESULT_DIR / "smart_traffic.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM smart_traffic {where_clause}", params)
+            total_blocks = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM smart_traffic {where_clause} AND congestion_level = 'High'", params)
+            high_congestion = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM smart_traffic {where_clause} AND congestion_level = predicted_congestion", params)
+            accurate_predictions = c.fetchone()[0]
+            accuracy = (accurate_predictions / total_blocks * 100) if total_blocks > 0 else 0
+            reports['code09'] = {
+                'total_blocks': total_blocks,
+                'high_congestion': high_congestion,
+                'prediction_accuracy': round(accuracy, 2)
+            }
+            conn.close()
+        else:
+            reports['code09'] = {'error': 'smart_traffic.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading smart_traffic.db: {e}")
+        reports['code09'] = {'error': str(e)}
+    
+    # گزارش برای code10
+    try:
+        db_path = RESULT_DIR / "self_healing.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM healing_network {where_clause}", params)
+            total_blocks = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM healing_network {where_clause} AND congestion_level = 'High'", params)
+            high_congestion = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM healing_network {where_clause} AND healing_action != 'None'", params)
+            self_heal_actions = c.fetchone()[0]
+            reports['code10'] = {
+                'total_blocks': total_blocks,
+                'high_congestion': high_congestion,
+                'self_heal_actions': self_heal_actions
+            }
+            conn.close()
+        else:
+            reports['code10'] = {'error': 'self_healing.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading self_healing.db: {e}")
+        reports['code10'] = {'error': str(e)}
+    
+    # گزارش برای code11
+    try:
+        db_path = RESULT_DIR / "optimized_resources.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM optimized_resources {where_clause}", params)
+            total_blocks = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM optimized_resources {where_clause} AND congestion_level = 'High'", params)
+            high_congestion = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM optimized_resources {where_clause} AND resource_allocation != 'No resource optimization needed'", params)
+            resource_allocations = c.fetchone()[0]
+            c.execute(f"SELECT DISTINCT node_id FROM optimized_resources {where_clause} AND traffic_volume > 50", params)
+            high_traffic_nodes = [row[0] for row in c.fetchall()]
+            reports['code11'] = {
+                'total_blocks': total_blocks,
+                'high_congestion': high_congestion,
+                'resource_allocations': resource_allocations,
+                'high_traffic_nodes': high_traffic_nodes
+            }
+            conn.close()
+        else:
+            reports['code11'] = {'error': 'optimized_resources.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading optimized_resources.db: {e}")
+        reports['code11'] = {'error': str(e)}
+    
+    # گزارش برای code12
+    try:
+        db_path = RESULT_DIR / "predictive_analysis.db"
+        if db_path.exists():
+            conn = sqlite3.connect(db_path)
+            c = conn.cursor()
+            c.execute(f"SELECT COUNT(*) FROM predictive_analysis {where_clause}", params)
+            total_predictions = c.fetchone()[0]
+            c.execute(f"SELECT COUNT(*) FROM predictive_analysis {where_clause} AND anomaly_detected = 1", params)
+            anomalies_detected = c.fetchone()[0]
+            reports['code12'] = {
+                'total_predictions': total_predictions,
+                'anomalies_detected': anomalies_detected
+            }
+            conn.close()
+        else:
+            reports['code12'] = {'error': 'predictive_analysis.db not found'}
+    except sqlite3.Error as e:
+        logging.error(f"Error reading predictive_analysis.db: {e}")
+        reports['code12'] = {'error': str(e)}
+    
+    return reports
 
-# کلاس NewOrderBlock
-class NewOrderBlock:
-    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer=None, 
-                 traffic_suggestion=None, is_congestion_order=False):
-        self.timestamp = timestamp
-        self.node_id = node_id
-        self.traffic_layer = traffic_layer
-        self.health_layer = health_layer
-        self.previous_hash = previous_hash
-        self.congestion_layer = congestion_layer or {"is_congested": 0, "score": 0.0, "impact": 0.0, "level": "Low"}
-        self.traffic_suggestion = traffic_suggestion
-        self.is_congestion_order = is_congestion_order
-        self.hash = self.calculate_hash()
-        # تولید signature به صورت هگزادسیمال
-        self.signature = self.calculate_signature()
-
-    def calculate_hash(self):
-        block_string = json.dumps({
-            "timestamp": self.timestamp,
-            "node_id": self.node_id,
-            "traffic_layer": self.traffic_layer,
-            "health_layer": self.health_layer,
-            "previous_hash": self.previous_hash,
-            "congestion_layer": self.congestion_layer,
-            "traffic_suggestion": self.traffic_suggestion,
-            "is_congestion_order": self.is_congestion_order
-        }, sort_keys=True).encode()
-        return hashlib.sha256(block_string).hexdigest()
-
-    def calculate_signature(self):
-        # تولید یه امضای ساده با استفاده از هش بلوک
-        signature_input = (self.hash + str(self.timestamp)).encode()
-        return hashlib.sha256(signature_input).hexdigest()
-
-def save_to_db(block):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO new_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
-               block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
-               block.traffic_suggestion, 1 if block.is_congestion_order else 0, block.signature))
-    conn.commit()
-    conn.close()
-
+# مسیرهای Flask
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
 
-@app.route('/favicon.ico')
-def favicon():
-    return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico')
+@app.route('/report/<report_type>', methods=['GET'])
+@app.route('/report', methods=['GET'])
+def report(report_type='traffic_report'):
+    node_id = request.args.get('node_id', '')
+    traffic_type = request.args.get('traffic_type', '')
+    time_range = request.args.get('time_range', '')
+    network_health = request.args.get('network_health', '')
+    
+    reports = get_reports(node_id, traffic_type, time_range, network_health)
+    
+    # تبدیل گزارش‌ها به فرمت جدول
+    columns = ['Code', 'Metric', 'Value']
+    rows = []
+    for code, report in reports.items():
+        if 'error' in report:
+            rows.append([code, 'Error', report['error']])
+        else:
+            for key, value in report.items():
+                rows.append([code, key.replace('_', ' ').title(), str(value)])
+    
+    return render_template('report.html', 
+                         reports=reports, 
+                         report_type=report_type,
+                         columns=columns,
+                         rows=rows,
+                         node_id=node_id,
+                         traffic_type=traffic_type,
+                         time_range=time_range,
+                         network_health=network_health)
 
-@app.route('/test-static')
-def test_static():
-    logger.debug(f"Static folder path: {app.static_folder}")
-    styles_path = os.path.join(app.static_folder, 'styles.css')
-    logger.debug(f"Looking for styles.css at: {styles_path}")
-    if os.path.exists(styles_path):
-        logger.debug("styles.css found!")
-    else:
-        logger.debug("styles.css NOT found!")
-    return send_from_directory('static', 'styles.css')
-
-@app.route('/run_script', methods=['POST'])
-def run_script():
-    script_id = request.form.get('script_id')
-    base_dir = Path(__file__).resolve().parent.parent  # استفاده از pathlib برای run_script
-    script_map = {
-        '01': os.path.join(base_dir, 'src/blockchain/code01_blockchain_initial_data.py'),
-        '02': os.path.join(base_dir, 'src/blockchain/code02_blockchain_congestion_improved.py'),
-        '03': os.path.join(base_dir, 'src/blockchain/code03_blockchain_managed_traffic.py'),
-        '04': os.path.join(base_dir, 'src/blockchain/code04_blockchain_with_new_orders.py'),
-        '05': os.path.join(base_dir, 'src/blockchain/code05_blockchain_with_real_time_orders.py'),
-        '06': os.path.join(base_dir, 'src/traffic/code06_traffic_data_preparation.py'),
-        '07': os.path.join(base_dir, 'src/traffic/code07_model_training.py'),
-        '08': os.path.join(base_dir, 'src/traffic/code08_advanced_traffic_report.py'),
-        '09': os.path.join(base_dir, 'src/smart/code09_smart_traffic_management.py'),
-        '12': os.path.join(base_dir, 'src/smart/code12_predictive_analysis_and_anomaly_detection.py'),
-        'self_healing': os.path.join(base_dir, 'src/smart/self_healing_network.py'),
-        'init': os.path.join(base_dir, 'src/init__.py')
-    }
-
-    script_path = script_map.get(script_id)
-    if script_path:
-        if script_id in processes and processes[script_id].poll() is None:
-            logger.warning(f"Script {script_id} is already running")
-            return jsonify({'error': 'Script is already running'})
-
-        try:
-            def run_and_emit():
-                env = os.environ.copy()
-                env["PYTHONUNBUFFERED"] = "1"
-
-                process = subprocess.Popen(
-                    ['python', script_path],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace',
-                    bufsize=1,
-                    env=env
-                )
-                processes[script_id] = process
-                stop_reading_flags[script_id] = False
-
-                socketio.emit('script_status', {'status': 'running', 'script_id': script_id}, namespace='/')
-
-                while True:
-                    if stop_reading_flags.get(script_id, False):
-                        break
-                    line = process.stdout.readline()
-                    if not line and process.poll() is None:
-                        break
-                    if line:
-                        if "Debugger is active" in line or "Debugger PIN" in line:
-                            continue
-                        socketio.emit('script_output', {'script_id': script_id, 'output': line.strip()}, namespace='/')
-
-                while True:
-                    if stop_reading_flags.get(script_id, False):
-                        break
-                    line = process.stderr.readline()
-                    if not line and process.poll() is None:
-                        break
-                    if line:
-                        if "Debugger is active" in line or "Debugger PIN" in line:
-                            continue
-                        socketio.emit('script_output', {'script_id': script_id, 'output': f"Error: {line.strip()}"}, namespace='/')
-
-                if not stop_reading_flags.get(script_id, False):
-                    socketio.emit('script_output', {'script_id': script_id, 'output': 'Script executed successfully.'}, namespace='/')
-                    report_link = None
-                    if script_id in ['01', '02', '03', '04', '12']:
-                        report_link = f"/report/{script_id}"
-                    socketio.emit('report_link', {'script_id': script_id, 'report_link': report_link}, namespace='/')
-                    socketio.emit('script_status', {'status': 'stopped', 'script_id': script_id}, namespace='/')
-
-                if script_id in processes:
-                    del processes[script_id]
-                if script_id in stop_reading_flags:
-                    del stop_reading_flags[script_id]
-
-            socketio.start_background_task(run_and_emit)
-            logger.info(f"Started script {script_id}")
-            return jsonify({'output': 'Script is running...', 'report_link': None})
-        except Exception as e:
-            logger.error(f"Error running script {script_id}: {str(e)}")
-            return jsonify({'error': str(e)})
-    else:
-        logger.warning(f"Invalid script ID: {script_id}")
-        return jsonify({'error': 'Invalid script ID'})
-
-@app.route('/stop_all_scripts', methods=['POST'])
-def stop_all_scripts():
-    logger.info("Received request to stop all scripts")
-    if not processes:
-        logger.info("No scripts are running")
-        socketio.emit('script_status', {'status': 'stopped_all', 'message': 'No scripts are running.'}, namespace='/')
-        return jsonify({'output': 'No scripts are running.'})
-
-    stopped_scripts = []
-    for script_id, process in list(processes.items()):
-        try:
-            logger.info(f"Attempting to stop script {script_id} with PID {process.pid}")
-            stop_reading_flags[script_id] = True
-
-            if process.poll() is None:
-                parent = psutil.Process(process.pid)
-                for child in parent.children(recursive=True):
-                    logger.debug(f"Terminating child process {child.pid}")
-                    child.kill()
-                parent.kill()
-                try:
-                    parent.wait(timeout=1)
-                    logger.info(f"Script {script_id} terminated successfully")
-                except psutil.TimeoutExpired:
-                    logger.warning(f"Script {script_id} did not terminate, killing it again")
-                    parent.kill()
-            stopped_scripts.append(script_id)
-        except Exception as e:
-            logger.error(f"Error stopping script {script_id}: {str(e)}")
-        finally:
-            if script_id in processes:
-                del processes[script_id]
-            if script_id in stop_reading_flags:
-                del stop_reading_flags[script_id]
-
-    logger.info(f"Stopped scripts: {stopped_scripts}")
-    socketio.emit('script_status', {'status': 'stopped_all', 'stopped_scripts': stopped_scripts}, namespace='/')
-    return jsonify({'output': f"Stopped scripts: {', '.join(stopped_scripts) if stopped_scripts else 'None'}"})
-
-@app.route('/stop_script', methods=['POST'])
-def stop_script():
-    script_id = request.form.get('script_id')
-    if script_id not in processes:
-        logger.warning(f"Script {script_id} is not running")
-        return jsonify({'error': 'Script is not running'})
-
+@app.route('/traffic_data', methods=['GET'])
+def traffic_data():
+    node_id = request.args.get('node_id', '')
+    traffic_type = request.args.get('traffic_type', '')
+    time_range = request.args.get('time_range', '')
+    
     try:
-        stop_reading_flags[script_id] = True
-        process = processes[script_id]
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=1)
-            except subprocess.TimeoutExpired:
-                process.kill()
-        socketio.emit('script_status', {'status': 'stopped', 'script_id': script_id}, namespace='/')
-        if script_id in processes:
-            del processes[script_id]
-        if script_id in stop_reading_flags:
-            del stop_reading_flags[script_id]
-        logger.info(f"Script {script_id} stopped")
-        return jsonify({'output': f'Script {script_id} stopped.'})
-    except Exception as e:
-        logger.error(f"Error stopping script {script_id}: {str(e)}")
-        return jsonify({'error': str(e)})
-
-@app.route('/force_stop_script', methods=['POST'])
-def force_stop_script():
-    script_id = request.form.get('script_id')
-    if script_id not in processes:
-        logger.warning(f"Script {script_id} is not running")
-        return jsonify({'error': 'Script is not running'})
-
-    try:
-        stop_reading_flags[script_id] = True
-        process = processes[script_id]
-        if process.poll() is None:
-            parent = psutil.Process(process.pid)
-            for child in parent.children(recursive=True):
-                child.kill()
-            parent.kill()
-            try:
-                parent.wait(timeout=1)
-            except psutil.TimeoutExpired:
-                parent.kill()
-        socketio.emit('script_status', {'status': 'stopped', 'script_id': script_id}, namespace='/')
-        if script_id in processes:
-            del processes[script_id]
-        if script_id in stop_reading_flags:
-            del stop_reading_flags[script_id]
-        logger.info(f"Script {script_id} force stopped")
-        return jsonify({'output': f'Script {script_id} force stopped.'})
-    except Exception as e:
-        logger.error(f"Error force stopping script {script_id}: {str(e)}")
-        return jsonify({'error': str(e)})
-
-def fetch_data_from_db(db_name, table_name, node_id='', traffic_type='', time_range='', network_health=''):
-    db_path = base_dir / 'result' / db_name  # استفاده از pathlib برای مسیر دیتابیس
-    try:
-        query = f"SELECT * FROM {table_name}"
-        conditions = []
-        params = []
-
-        if node_id:
-            conditions.append("node_id = ?")
-            params.append(node_id)
-
-        if traffic_type:
-            conditions.append("traffic_type = ?")
-            params.append(traffic_type)
-
-        if time_range:
-            now = datetime.now()
-            if time_range == '1h':
-                time_threshold = now - timedelta(hours=1)
-            elif time_range == '24h':
-                time_threshold = now - timedelta(hours=24)
-            elif time_range == '7d':
-                time_threshold = now - timedelta(days=7)
-            else:
-                time_threshold = None
-
-            if time_threshold:
-                conditions.append("timestamp >= ?")
-                params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
-
-        if network_health:
-            conditions.append("network_health = ?")
-            params.append(network_health)
-
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        query += " ORDER BY timestamp DESC"
-
+        db_path = RESULT_DIR / "traffic_data.db"
+        if not db_path.exists():
+            return jsonify({'error': 'traffic_data.db not found'})
+        
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute(query, params)
-        rows = c.fetchall()
-        columns = [description[0] for description in c.description]
-        conn.close()
-        logger.debug(f"Fetched data from {db_name}, table {table_name} with filters - node_id: {node_id}, traffic_type: {traffic_type}, time_range: {time_range}, network_health: {network_health}")
-        return rows, columns
-    except sqlite3.Error as e:
-        logger.error(f"Error fetching data from {db_name}, table {table_name}: {str(e)}")
-        return [], []
-
-@app.route('/report/<report_type>')
-def report(report_type):
-    report_map = {
-        '01': ('traffic_data.db', 'blocks'),
-        '02': ('congestion_data.db', 'congestion_blocks'),
-        '03': ('managed_traffic.db', 'managed_blocks'),
-        '04': ('new_orders.db', 'new_orders'),
-        '12': ('predictive_analysis.db', 'predictive_analysis'),
-        'initial_data': ('traffic_data.db', 'blocks'),
-        'congestion': ('congestion_data.db', 'congestion_blocks'),
-        'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
-        'new_orders': ('new_orders.db', 'new_orders'),
-        'real_time_orders': ('real_time_orders.db', 'real_time_orders'),
-        'self_healing': ('self_healing.db', 'healing_network'),
-        'smart_traffic': ('smart_traffic.db', 'smart_traffic'),
-        'traffic_report': ('traffic_report.db', 'traffic_report')
-    }
-
-    db_name, table_name = report_map.get(report_type, (None, None))
-    if db_name and table_name:
-        node_id = request.args.get('node_id', '')
-        traffic_type = request.args.get('traffic_type', '')
-        time_range = request.args.get('time_range', '')
-        network_health = request.args.get('network_health', '')
-
-        rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
-        return render_template('report.html', rows=rows, columns=columns, report_type=report_type)
-    else:
-        logger.warning(f"Invalid report type: {report_type}")
-        return "Invalid report type", 404
-
-@app.route('/traffic_data')
-def traffic_data():
-    try:
-        node_id = request.args.get('node_id', '')
-        traffic_type = request.args.get('traffic_type', '')
-        time_range = request.args.get('time_range', '')
-
-        query = "SELECT timestamp, traffic_volume, network_health, latency, traffic_type FROM real_time_orders"
-        conditions = []
+        
+        where_clauses = []
         params = []
-
         if node_id:
-            conditions.append("node_id = ?")
+            where_clauses.append("node_id = ?")
             params.append(node_id)
-
         if traffic_type:
-            conditions.append("traffic_type = ?")
+            where_clauses.append("traffic_type = ?")
             params.append(traffic_type)
-
         if time_range:
-            now = datetime.now()
-            if time_range == '1m':
-                time_threshold = now - timedelta(minutes=1)
-            elif time_range == '5m':
-                time_threshold = now - timedelta(minutes=5)
-            else:
-                time_threshold = None
-
-            if time_threshold:
-                conditions.append("timestamp >= ?")
-                params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
-
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        query += " ORDER BY timestamp DESC LIMIT 10"
-
-        conn = sqlite3.connect(real_time_db)
-        c = conn.cursor()
-        c.execute(query, params)
+            if time_range == '24h':
+                where_clauses.append("timestamp >= datetime('now', '-1 day')")
+            elif time_range == '7d':
+                where_clauses.append("timestamp >= datetime('now', '-7 days')")
+            elif time_range == '30d':
+                where_clauses.append("timestamp >= datetime('now', '-30 days')")
+        
+        where_clause = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        # گرفتن داده‌ها
+        c.execute(f"SELECT timestamp, traffic_volume, network_health, latency FROM blocks {where_clause} ORDER BY timestamp DESC LIMIT 100", params)
         rows = c.fetchall()
-        conn.close()
-
-        logger.debug("Fetched rows from DB: %s", rows)
-
+        
         timestamps = [row[0] for row in rows]
-        volumes = [min(100, max(0, float(row[1]) + random.uniform(-20, 20))) for row in rows]
-        health_map = {'good': 0, 'moderate': 4, 'poor': 8}
-        network_health_scores = [min(8, max(0, health_map.get(row[2], 0) + random.uniform(-1, 1))) for row in rows]
-        latencies = [min(200, max(0, float(row[3]) + random.uniform(-30, 30))) for row in rows]
-        traffic_types = [row[4] for row in rows]
-        type_counts = {}
-        for t in traffic_types:
-            type_counts[t] = type_counts.get(t, 0) + 1
-
-        max_count = max(type_counts.values(), default=1)
-        normalized_type_counts = {t: (count / max_count) * 10 for t, count in type_counts.items()}
-
-        logger.debug("Processed data: %s", {
-            'timestamps': timestamps,
-            'volumes': volumes,
-            'network_health_scores': network_health_scores,
-            'latencies': latencies,
-            'traffic_types': list(normalized_type_counts.keys()),
-            'type_counts': list(normalized_type_counts.values())
-        })
-
+        volumes = [row[1] for row in rows]
+        health_scores = {'Good': 0, 'Fair': 0, 'Moderate': 0, 'Poor': 0, 'Bad': 0}
+        for row in rows:
+            health = row[2]
+            if health in health_scores:
+                health_scores[health] += 1
+        latencies = [row[3] for row in rows]
+        
+        # گرفتن انواع ترافیک
+        c.execute(f"SELECT traffic_type, COUNT(*) FROM blocks {where_clause} GROUP BY traffic_type", params)
+        type_data = c.fetchall()
+        traffic_types = [row[0] for row in type_data]
+        type_counts = [row[1] for row in type_data]
+        
+        conn.close()
+        
         return jsonify({
             'timestamps': timestamps,
             'volumes': volumes,
-            'network_health_scores': network_health_scores,
+            'network_health_scores': [health_scores['Good'], health_scores['Fair'], health_scores['Moderate'], health_scores['Poor'], health_scores['Bad']],
             'latencies': latencies,
-            'traffic_types': list(normalized_type_counts.keys()),
-            'type_counts': list(normalized_type_counts.values())
+            'traffic_types': traffic_types,
+            'type_counts': type_counts
         })
     except sqlite3.Error as e:
-        logger.error("Database error: %s", str(e))
+        logging.error(f"Error reading traffic_data.db: {e}")
         return jsonify({'error': str(e)})
 
-@app.route('/predictions')
+@app.route('/predictions', methods=['GET'])
 def predictions():
+    node_id = request.args.get('node_id', '')
+    time_range = request.args.get('time_range', '')
+    
     try:
-        node_id = request.args.get('node_id', '')
-        time_range = request.args.get('time_range', '')
-
-        query = "SELECT timestamp, node_id, traffic_volume, congestion_level, predicted_congestion FROM predictive_analysis"
-        conditions = []
-        params = []
-
-        if node_id:
-            conditions.append("node_id = ?")
-            params.append(node_id)
-
-        if time_range:
-            now = datetime.now()
-            if time_range == '1m':
-                time_threshold = now - timedelta(minutes=1)
-            elif time_range == '5m':
-                time_threshold = now - timedelta(minutes=5)
-            else:
-                time_threshold = None
-
-            if time_threshold:
-                conditions.append("timestamp >= ?")
-                params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
-
-        if conditions:
-            query += " WHERE " + " AND ".join(conditions)
-
-        query += " ORDER BY timestamp DESC LIMIT 10"
-
-        conn = sqlite3.connect(predictive_db)
+        db_path = RESULT_DIR / "predictive_analysis.db"
+        if not db_path.exists():
+            return jsonify({'error': 'predictive_analysis.db not found'})
+        
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute(query, params)
+        
+        where_clauses = []
+        params = []
+        if node_id:
+            where_clauses.append("node_id = ?")
+            params.append(node_id)
+        if time_range:
+            if time_range == '24h':
+                where_clauses.append("timestamp >= datetime('now', '-1 day')")
+            elif time_range == '7d':
+                where_clauses.append("timestamp >= datetime('now', '-7 days')")
+            elif time_range == '30d':
+                where_clauses.append("timestamp >= datetime('now', '-30 days')")
+        
+        where_clause = " WHERE " + " AND ".join(where_clauses) if where_clauses else ""
+        
+        c.execute(f"SELECT node_id, actual_congestion, predicted_congestion FROM predictive_analysis {where_clause} ORDER BY timestamp DESC LIMIT 50", params)
         rows = c.fetchall()
+        
+        node_ids = [row[0] for row in rows]
+        actual_congestion = [row[1] for row in rows]
+        predicted_congestion = [row[2] for row in rows]
+        
         conn.close()
-
-        logger.debug("Fetched predictions from DB: %s", rows)
-
-        timestamps = [row[0] for row in rows]
-        node_ids = [row[1] for row in rows]
-        traffic_volumes = [float(row[2]) for row in rows]
-        congestion_mapping = {"Low": 0, "Medium": 1, "High": 2}
-        actual_congestion = [congestion_mapping.get(row[3], 0) for row in rows]
-        predicted_congestion = [congestion_mapping.get(row[4], 0) for row in rows]
-
+        
         return jsonify({
-            'timestamps': timestamps,
             'node_ids': node_ids,
-            'traffic_volumes': traffic_volumes,
             'actual_congestion': actual_congestion,
             'predicted_congestion': predicted_congestion
         })
     except sqlite3.Error as e:
-        logger.error("Database error in predictions: %s", str(e))
+        logging.error(f"Error reading predictive_analysis.db: {e}")
         return jsonify({'error': str(e)})
 
-@app.route('/traffic_report_data')
+@app.route('/traffic_report_data', methods=['GET'])
 def traffic_report_data():
     try:
-        query = "SELECT timestamp, node_id, daily_average_traffic, daily_max_traffic, daily_min_traffic, health_trend FROM traffic_report ORDER BY timestamp DESC LIMIT 50"
-        conn = sqlite3.connect(traffic_report_db)
+        db_path = RESULT_DIR / "traffic_report.db"
+        if not db_path.exists():
+            return jsonify({'error': 'traffic_report.db not found'})
+        
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute(query)
-        rows = c.fetchall()
+        
+        c.execute("SELECT timestamp, value FROM traffic_report WHERE report_type = 'daily_average' ORDER BY timestamp DESC LIMIT 30")
+        daily_avg = c.fetchall()
+        
+        c.execute("SELECT timestamp, value FROM traffic_report WHERE report_type = 'high_traffic' ORDER BY timestamp DESC LIMIT 30")
+        daily_max = c.fetchall()
+        
+        c.execute("SELECT timestamp, value FROM traffic_report WHERE report_type = 'low_traffic' ORDER BY timestamp DESC LIMIT 30")
+        daily_min = c.fetchall()
+        
+        c.execute("SELECT timestamp, details FROM traffic_report WHERE report_type = 'health_impact' ORDER BY timestamp DESC LIMIT 30")
+        health_trend = c.fetchall()
+        
         conn.close()
-
-        timestamps = [row[0] for row in rows]
-        node_ids = [row[1] for row in rows]
-        daily_avg_traffic = [float(row[2]) for row in rows]
-        daily_max_traffic = [float(row[3]) for row in rows]
-        daily_min_traffic = [float(row[4]) for row in rows]
-        health_trend = [row[5] for row in rows]
-
+        
         return jsonify({
-            'timestamps': timestamps,
-            'node_ids': node_ids,
-            'daily_avg_traffic': daily_avg_traffic,
-            'daily_max_traffic': daily_max_traffic,
-            'daily_min_traffic': daily_min_traffic,
-            'health_trend': health_trend
+            'timestamps': [row[0] for row in daily_avg],
+            'daily_avg_traffic': [row[1] for row in daily_avg],
+            'daily_max_traffic': [row[1] for row in daily_max],
+            'daily_min_traffic': [row[1] for row in daily_min],
+            'health_trend': [row[1] for row in health_trend]
         })
     except sqlite3.Error as e:
-        logger.error("Database error in traffic_report_data: %s", str(e))
+        logging.error(f"Error reading traffic_report.db: {e}")
         return jsonify({'error': str(e)})
-
-@app.route('/export/pdf/<report_type>')
-def export_pdf(report_type):
-    report_map = {
-        '01': ('traffic_data.db', 'blocks'),
-        '02': ('congestion_data.db', 'congestion_blocks'),
-        '03': ('managed_traffic.db', 'managed_blocks'),
-        '04': ('new_orders.db', 'new_orders'),
-        '12': ('predictive_analysis.db', 'predictive_analysis'),
-        'initial_data': ('traffic_data.db', 'blocks'),
-        'congestion': ('congestion_data.db', 'congestion_blocks'),
-        'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
-        'new_orders': ('new_orders.db', 'new_orders'),
-        'real_time_orders': ('real_time_orders.db', 'real_time_orders'),
-        'self_healing': ('self_healing.db', 'healing_network'),
-        'smart_traffic': ('smart_traffic.db', 'smart_traffic'),
-        'traffic_report': ('traffic_report.db', 'traffic_report')
-    }
-
-    db_name, table_name = report_map.get(report_type, (None, None))
-    if not db_name or not table_name:
-        return jsonify({'error': 'Invalid report type'}), 404
-
-    node_id = request.args.get('node_id', '')
-    traffic_type = request.args.get('traffic_type', '')
-    time_range = request.args.get('time_range', '')
-    network_health = request.args.get('network_health', '')
-
-    rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
-
-    # Create PDF
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    elements = []
-
-    styles = getSampleStyleSheet()
-    elements.append(Paragraph(f"Traffic Report - {report_type}", styles['Title']))
-    elements.append(Paragraph("Generated on: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'), styles['Normal']))
-    elements.append(Paragraph(" ", styles['Normal']))
-
-    # Prepare table data
-    table_data = [columns]  # Header row
-    for row in rows:
-        table_data.append([str(item) for item in row])
-
-    # Create table
-    table = Table(table_data)
-    table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('FONTSIZE', (0, 0), (-1, 0), 12),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
-        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
-        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 1), (-1, -1), 10),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    elements.append(table)
-
-    doc.build(elements)
-    buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"traffic_report_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
-        mimetype='application/pdf'
-    )
-
-@app.route('/export/excel/<report_type>')
-def export_excel(report_type):
-    report_map = {
-        '01': ('traffic_data.db', 'blocks'),
-        '02': ('congestion_data.db', 'congestion_blocks'),
-        '03': ('managed_traffic.db', 'managed_blocks'),
-        '04': ('new_orders.db', 'new_orders'),
-        '12': ('predictive_analysis.db', 'predictive_analysis'),
-        'initial_data': ('traffic_data.db', 'blocks'),
-        'congestion': ('congestion_data.db', 'congestion_blocks'),
-        'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
-        'new_orders': ('new_orders.db', 'new_orders'),
-        'real_time_orders': ('real_time_orders.db', 'real_time_orders'),
-        'self_healing': ('self_healing.db', 'healing_network'),
-        'smart_traffic': ('smart_traffic.db', 'smart_traffic'),
-        'traffic_report': ('traffic_report.db', 'traffic_report')
-    }
-
-    db_name, table_name = report_map.get(report_type, (None, None))
-    if not db_name or not table_name:
-        return jsonify({'error': 'Invalid report type'}), 404
-
-    node_id = request.args.get('node_id', '')
-    traffic_type = request.args.get('traffic_type', '')
-    time_range = request.args.get('time_range', '')
-    network_health = request.args.get('network_health', '')
-
-    rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
-
-    # Create DataFrame
-    df = pd.DataFrame(rows, columns=columns)
-
-    # Create Excel file
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Traffic Report')
-    buffer.seek(0)
-
-    return send_file(
-        buffer,
-        as_attachment=True,
-        download_name=f"traffic_report_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    )
 
 @app.route('/add_new_order', methods=['POST'])
 def add_new_order():
     try:
-        node_id = request.form.get('node_id')
-        traffic_type = request.form.get('traffic_type')
-        traffic_volume = float(request.form.get('traffic_volume'))
-        network_health = request.form.get('network_health')
-        latency = float(request.form.get('latency'))
-
-        if not node_id or node_id not in nodes:
-            return jsonify({'error': 'Invalid Node ID'})
-        if traffic_type not in ["Data", "Stream", "Game"]:
-            return jsonify({'error': 'Invalid Traffic Type'})
-        if traffic_volume < 0:
-            return jsonify({'error': 'Traffic Volume must be positive'})
-        if network_health not in ["Normal", "Delayed", "Down"]:
-            return jsonify({'error': 'Invalid Network Health'})
-        if latency < 0:
-            return jsonify({'error': 'Latency must be positive'})
-
-        conn = sqlite3.connect(output_db)
+        data = request.form
+        node_id = data.get('node_id')
+        traffic_type = data.get('traffic_type')
+        traffic_volume = float(data.get('traffic_volume'))
+        network_health = data.get('network_health')
+        latency = float(data.get('traffic_volume'))
+        
+        if not all([node_id, traffic_type, traffic_volume >= 0, network_health, latency >= 0]):
+            return jsonify({'error': 'Invalid or missing data'})
+        
+        db_path = RESULT_DIR / "new_orders.db"
+        conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("SELECT * FROM new_orders ORDER BY timestamp DESC LIMIT 1")
-        last_row = c.fetchone()
-        conn.close()
-
-        previous_block = None
-        if last_row:
-            traffic_layer = {"type": last_row[2], "volume": float(last_row[3])}
-            health_layer = {"status": last_row[4], "latency": float(last_row[5])}
-            congestion_layer = {
-                "is_congested": 1 if last_row[8] in ["Medium", "High"] else 0, 
-                "score": float(last_row[9]), 
-                "impact": float(last_row[10]), 
-                "level": last_row[8]
-            }
-            previous_block = NewOrderBlock(
-                last_row[0], last_row[1], traffic_layer, health_layer, last_row[6], 
-                congestion_layer, last_row[11], bool(last_row[12])
+        
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS new_orders (
+                node_id TEXT,
+                traffic_type TEXT,
+                traffic_volume REAL,
+                network_health TEXT,
+                latency REAL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            previous_block.hash = last_row[7]
-
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-
-        if traffic_volume > 70:
-            level = "High"
-            is_congested = 1
-        elif 40 <= traffic_volume <= 70:
-            level = "Medium"
-            is_congested = 1
-        else:
-            level = "Low"
-            is_congested = 0
-
-        congestion_score = random.uniform(0, 100) if is_congested else 0.0
-        latency_impact = random.uniform(0, 10) if is_congested else 0.0
-        traffic_layer = {"type": traffic_type, "volume": traffic_volume}
-        health_layer = {"status": network_health, "latency": latency}
-        congestion_layer = {
-            "is_congested": is_congested, 
-            "score": congestion_score, 
-            "impact": latency_impact, 
-            "level": level
-        }
-
-        traffic_suggestion = None
-        is_congestion_order = False
-        if is_congested:
-            neighbors = graph[node_id]["neighbors"]
-            traffic_suggestion = f"Redirect {traffic_type} to {random.choice(neighbors)}" if neighbors else "Reduce load"
-            is_congestion_order = True
-
-        previous_hash = previous_block.hash if previous_block else "0"
-        new_block = NewOrderBlock(
-            timestamp, node_id, traffic_layer, health_layer, previous_hash, 
-            congestion_layer, traffic_suggestion, is_congestion_order
-        )
-
-        save_to_db(new_block)
-
-        logger.info(f"New order added: Node {node_id}, Traffic Type {traffic_type}")
-        return jsonify({'message': 'Order added successfully'})
+        """)
+        
+        c.execute("""
+            INSERT INTO new_orders (node_id, traffic_type, traffic_volume, network_health, latency)
+            VALUES (?, ?, ?, ?, ?)
+        """, (node_id, traffic_type, traffic_volume, network_health, latency))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'status': 'success'})
     except Exception as e:
-        logger.error(f"Error adding new order: {str(e)}")
+        logging.error(f"Error adding new order: {e}")
         return jsonify({'error': str(e)})
 
+@app.route('/export/pdf/<report_type>', methods=['GET'])
+def export_pdf(report_type):
+    return jsonify({'status': 'error', 'message': 'PDF export not implemented yet'})
+
+@app.route('/export/excel/<report_type>', methods=['GET'])
+def export_excel(report_type):
+    return jsonify({'status': 'error', 'message': 'Excel export not implemented yet'})
+
+@app.route('/run_project', methods=['POST'])
+def run_project():
+    def run_all_scripts():
+        for code, script_name in SCRIPTS.items():
+            socketio.emit('output', f"Starting {script_name}...")
+            run_script(script_name, socketio)
+    
+    threading.Thread(target=run_all_scripts, daemon=True).start()
+    return jsonify({'status': 'started'})
+
+@app.route('/run_module/<code>', methods=['POST'])
+def run_module(code):
+    if code not in SCRIPTS:
+        logging.error(f"Invalid module requested: {code}")
+        return jsonify({'status': 'error', 'message': f"Invalid module: {code}"})
+    
+    threading.Thread(target=run_script, args=(SCRIPTS[code], socketio), daemon=True).start()
+    return jsonify({'status': 'started'})
+
+# مدیریت WebSocket
 @socketio.on('connect')
 def handle_connect():
-    logger.info('Client connected')
+    logging.info('Client connected to WebSocket')
+    socketio.emit('output', 'Connected to WebSocket server')
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    logger.info('Client disconnected')
+    logging.info('Client disconnected from WebSocket')
 
 if __name__ == '__main__':
-    logger.info("Skipping Tailwind CSS execution as styles.css already exists.")
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    logging.info('Starting Flask-SocketIO server...')
+    socketio.run(app, host='0.0.0.0', port=5000, debug=True, use_reloader=True)

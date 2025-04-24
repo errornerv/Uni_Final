@@ -1,7 +1,7 @@
 import subprocess
 import sys
 
-# لیست پکیج‌ها با نسخه‌هاشون
+
 packages = [
     "numpy==1.24.3",
     "cryptography==42.0.2",
@@ -14,17 +14,19 @@ packages = [
     "matplotlib==3.7.1",
     "requests==2.31.0",
     "psutil==5.9.5",
-    "reportlab==4.2.2",  
-    "openpyxl==3.1.5"    
+    "reportlab==4.2.2",
+    "openpyxl==3.1.5",
+    "gevent==24.2.1",
+    "gevent-websocket==0.10.1"
 ]
 
 def install_packages():
     for package in packages:
         try:
             subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-            print(f"completed {package}")
+            print(f"Successfully installed {package}")
         except subprocess.CalledProcessError:
-            print(f"error in instalingworking on {package}")
+            print(f"Error installing {package}")
 
 if __name__ == "__main__":
     install_packages()
