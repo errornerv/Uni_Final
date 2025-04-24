@@ -196,16 +196,16 @@ $('#add-order-form').on('submit', function(e) {
 
     // Basic client-side validation
     if (!formData.node_id || !formData.traffic_type || !formData.traffic_volume || !formData.network_health || !formData.latency) {
-        $('#form-message').html('<span style="color: red;">Please fill in all fields.</span>');
+        $('#form-message').html('<span class="bg-red-100 text-red-error px-3 py-1 rounded">Please fill in all fields.</span>');
         return;
     }
 
     if (formData.traffic_volume < 0 || formData.latency < 0) {
-        $('#form-message').html('<span style="color: red;">Traffic volume and latency must be positive numbers.</span>');
+        $('#form-message').html('<span class="bg-red-100 text-red-error px-3 py-1 rounded">Traffic volume and latency must be positive numbers.</span>');
         return;
     }
 
-    $('#form-message').html('<span style="color: blue;">Adding order...</span>');
+    $('#form-message').html('<span class="bg-blue-100 text-blue-hover px-3 py-1 rounded">Adding order...</span>');
     showLoading();
 
     $.ajax({
@@ -215,10 +215,10 @@ $('#add-order-form').on('submit', function(e) {
         success: function(data) {
             hideLoading();
             if (data.error) {
-                $('#form-message').html('<span style="color: red;">Error: ' + data.error + '</span>');
+                $('#form-message').html('<span class="bg-red-100 text-red-error px-3 py-1 rounded">Error: ' + data.error + '</span>');
                 customLog('ERROR', 'Error adding new order: ' + data.error);
             } else {
-                $('#form-message').html('<span style="color: green;">Order added successfully!</span>');
+                $('#form-message').html('<span class="bg-green-100 text-green-success px-3 py-1 rounded">Order added successfully!</span>');
                 customLog('INFO', 'New order added successfully');
                 // Clear the form
                 $('#add-order-form')[0].reset();
@@ -228,7 +228,7 @@ $('#add-order-form').on('submit', function(e) {
         },
         error: function(xhr, status, error) {
             hideLoading();
-            $('#form-message').html('<span style="color: red;">Failed to add order: ' + status + ', ' + error + '</span>');
+            $('#form-message').html('<span class="bg-red-100 text-red-error px-3 py-1 rounded">Failed to add order: ' + status + ', ' + error + '</span>');
             customLog('ERROR', 'Failed to add new order: ' + status + ', ' + error);
         }
     });
@@ -241,6 +241,13 @@ function toggleAddOrderForm() {
     console.log("addOrderSection:", addOrderSection); // برای دیباگ
     addOrderSection.toggleClass('show');
     console.log("show class after toggle:", addOrderSection.hasClass('show')); // برای دیباگ
+    if (addOrderSection.hasClass('show')) {
+        addOrderSection.removeClass('opacity-0 max-h-0 overflow-hidden');
+        addOrderSection.addClass('opacity-100 max-h-[1000px] overflow-visible');
+    } else {
+        addOrderSection.removeClass('opacity-100 max-h-[1000px] overflow-visible');
+        addOrderSection.addClass('opacity-0 max-h-0 overflow-hidden');
+    }
 }
 
 // تابع برای گرفتن و آپدیت داده‌های گزارش
@@ -285,15 +292,15 @@ function hideLoading() {
 function createScriptOutputPanel(scriptId) {
     if (!scriptOutputs[scriptId]) {
         const outputDiv = document.createElement('div');
-        outputDiv.className = 'script-panel';
+        outputDiv.className = 'script-panel bg-gray-light rounded-lg p-4 mb-4 max-h-[300px] overflow-y-auto shadow-small';
         outputDiv.id = `panel-${scriptId}`;
         outputDiv.innerHTML = `
-            <h4 onclick="toggleOutput('${scriptId}')">Script: ${scriptId} <i class="fas fa-chevron-down" id="_toggle-output-${scriptId}"></i></h4>
-            <pre id="output-${scriptId}" class="script-output bg-light p-3 border rounded" style="display: block;"></pre>
+            <h4 onclick="toggleOutput('${scriptId}')" class="mb-3 cursor-pointer flex justify-between items-center">Script: ${scriptId} <i class="fas fa-chevron-down" id="_toggle-output-${scriptId}"></i></h4>
+            <pre id="output-${scriptId}" class="script-output bg-white p-4 border rounded block"></pre>
             <div id="link-${scriptId}" class="mt-2"></div>
-            <div class="script-toolbar mt-2">
-                <button onclick="stopScript('${scriptId}', true)"><i class="fas fa-stop"></i> Stop</button>
-                <button onclick="clearScriptOutput('${scriptId}')"><i class="fas fa-trash-alt"></i> Clear</button>
+            <div class="script-toolbar mt-2 flex gap-3 sticky bottom-0 bg-gray-light pt-3">
+                <button onclick="stopScript('${scriptId}', true)" class="bg-red-error border-none px-3 py-1 rounded text-white transition-all duration-200 hover:bg-red-hover hover:scale-105"><i class="fas fa-stop"></i> Stop</button>
+                <button onclick="clearScriptOutput('${scriptId}')" class="bg-red-error border-none px-3 py-1 rounded text-white transition-all duration-200 hover:bg-red-hover hover:scale-105"><i class="fas fa-trash-alt"></i> Clear</button>
             </div>
         `;
         document.getElementById('script-outputs').appendChild(outputDiv);
@@ -314,7 +321,7 @@ socket.on('script_output', function(data) {
 socket.on('report_link', function(data) {
     createScriptOutputPanel(data.script_id);
     if (data.report_link) {
-        $(`#link-${data.script_id}`).html(`<a href="${data.report_link}" class="btn btn-info">View Report</a>`);
+        $(`#link-${data.script_id}`).html(`<a href="${data.report_link}" class="btn btn-info px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 bg-blue-500 text-white hover:bg-blue-600">View Report</a>`);
     } else {
         $(`#link-${data.script_id}`).html('');
     }
@@ -456,12 +463,108 @@ function toggleSidebar() {
     const mainContent = $('#main-content');
     sidebar.toggleClass('collapsed');
     mainContent.toggleClass('full-width');
+    if (sidebar.hasClass('collapsed')) {
+        sidebar.addClass('-translate-x-full');
+        mainContent.removeClass('ml-[250px] w-[calc(100%-250px)]');
+        mainContent.addClass('ml-0 w-full');
+    } else {
+        sidebar.removeClass('-translate-x-full');
+        mainContent.removeClass('ml-0 w-full');
+        mainContent.addClass('ml-[250px] w-[calc(100%-250px)]');
+    }
 }
 
 function toggleTheme() {
     $('body').toggleClass('dark-theme');
     const icon = $('.theme-toggle i');
     icon.toggleClass('fa-moon fa-sun');
+    if ($('body').hasClass('dark-theme')) {
+        $('body').removeClass('bg-gradient-to-br from-light-bg to-light-gray text-text-dark');
+        $('body').addClass('bg-gradient-to-br from-dark-blue to-sidebar-bg text-white');
+        $('header').removeClass('bg-dark-blue');
+        $('header').addClass('bg-[#141C2F]');
+        $('.sidebar').removeClass('bg-sidebar-bg');
+        $('.sidebar').addClass('bg-dark-blue');
+        $('.menu-item').removeClass('bg-sidebar-menu hover:bg-sidebar-hover');
+        $('.menu-item').addClass('bg-sidebar-bg hover:bg-sidebar-hover');
+        $('.sub-menu a, .sub-menu p').removeClass('bg-sidebar-menu hover:bg-sidebar-hover');
+        $('.sub-menu a, .sub-menu p').addClass('bg-sidebar-bg hover:bg-sidebar-hover');
+        $('.output-container, .card, .chart-card').removeClass('bg-white shadow-medium');
+        $('.output-container, .card, .chart-card').addClass('bg-sidebar-bg shadow-dark');
+        $('.script-panel').removeClass('bg-gray-light');
+        $('.script-panel').addClass('bg-gray-dark');
+        $('.filter-section').removeClass('bg-white border-gray-border shadow-light');
+        $('.filter-section').addClass('bg-sidebar-bg border-sidebar-hover shadow-dark');
+        $('.filter-section label').removeClass('text-dark-blue');
+        $('.filter-section label').addClass('text-text-light');
+        $('.filter-section select').removeClass('bg-gray-50');
+        $('.filter-section select').addClass('bg-gray-dark text-text-light border-sidebar-hover');
+        $('.filter-section select:focus').removeClass('bg-white');
+        $('.filter-section select:focus').addClass('bg-sidebar-menu');
+        $('.report-page h1').removeClass('text-dark-blue');
+        $('.report-page h1').addClass('text-text-light');
+        $('.table th').removeClass('bg-dark-blue');
+        $('.table th').addClass('bg-sidebar-bg');
+        $('.table td').removeClass('bg-gray-light border-gray-border');
+        $('.table td').addClass('bg-gray-dark border-sidebar-hover');
+        $('.table tr:hover').removeClass('bg-gray-200');
+        $('.table tr:hover').addClass('bg-sidebar-hover');
+        $('#add-order-form .card').removeClass('bg-gradient-to-br from-white to-gray-light border-gray-border shadow-light');
+        $('#add-order-form .card').addClass('bg-gradient-to-br from-sidebar-bg to-gray-dark border-sidebar-hover shadow-dark');
+        $('#add-order-form .card h3').removeClass('text-dark-blue');
+        $('#add-order-form .card h3').addClass('text-text-light');
+        $('#add-order-form .form-group label').removeClass('text-text-dark');
+        $('#add-order-form .form-group label').addClass('text-text-light');
+        $('#add-order-form .form-group select, #add-order-form .form-group input').removeClass('bg-gray-50');
+        $('#add-order-form .form-group select, #add-order-form .form-group input').addClass('bg-gray-dark text-text-light border-sidebar-hover');
+        $('#add-order-form .form-group select:focus, #add-order-form .form-group input:focus').removeClass('bg-white');
+        $('#add-order-form .form-group select:focus, #add-order-form .form-group input:focus').addClass('bg-sidebar-menu');
+        $('.add-order-toggle').removeClass('bg-teal hover:bg-blue-hover');
+        $('.add-order-toggle').addClass('bg-teal hover:bg-blue-hover');
+    } else {
+        $('body').removeClass('bg-gradient-to-br from-dark-blue to-sidebar-bg text-white');
+        $('body').addClass('bg-gradient-to-br from-light-bg to-light-gray text-text-dark');
+        $('header').removeClass('bg-[#141C2F]');
+        $('header').addClass('bg-dark-blue');
+        $('.sidebar').removeClass('bg-dark-blue');
+        $('.sidebar').addClass('bg-sidebar-bg');
+        $('.menu-item').removeClass('bg-sidebar-bg hover:bg-sidebar-hover');
+        $('.menu-item').addClass('bg-sidebar-menu hover:bg-sidebar-hover');
+        $('.sub-menu a, .sub-menu p').removeClass('bg-sidebar-bg hover:bg-sidebar-hover');
+        $('.sub-menu a, .sub-menu p').addClass('bg-sidebar-menu hover:bg-sidebar-hover');
+        $('.output-container, .card, .chart-card').removeClass('bg-sidebar-bg shadow-dark');
+        $('.output-container, .card, .chart-card').addClass('bg-white shadow-medium');
+        $('.script-panel').removeClass('bg-gray-dark');
+        $('.script-panel').addClass('bg-gray-light');
+        $('.filter-section').removeClass('bg-sidebar-bg border-sidebar-hover shadow-dark');
+        $('.filter-section').addClass('bg-white border-gray-border shadow-light');
+        $('.filter-section label').removeClass('text-text-light');
+        $('.filter-section label').addClass('text-dark-blue');
+        $('.filter-section select').removeClass('bg-gray-dark text-text-light border-sidebar-hover');
+        $('.filter-section select').addClass('bg-gray-50 text-black border-gray-border');
+        $('.filter-section select:focus').removeClass('bg-sidebar-menu');
+        $('.filter-section select:focus').addClass('bg-white');
+        $('.report-page h1').removeClass('text-text-light');
+        $('.report-page h1').addClass('text-dark-blue');
+        $('.table th').removeClass('bg-sidebar-bg');
+        $('.table th').addClass('bg-dark-blue');
+        $('.table td').removeClass('bg-gray-dark border-sidebar-hover');
+        $('.table td').addClass('bg-gray-light border-gray-border');
+        $('.table tr:hover').removeClass('bg-sidebar-hover');
+        $('.table tr:hover').addClass('bg-gray-200');
+        $('#add-order-form .card').removeClass('bg-gradient-to-br from-sidebar-bg to-gray-dark border-sidebar-hover shadow-dark');
+        $('#add-order-form .card').addClass('bg-gradient-to-br from-white to-gray-light border-gray-border shadow-light');
+        $('#add-order-form .card h3').removeClass('text-text-light');
+        $('#add-order-form .card h3').addClass('text-dark-blue');
+        $('#add-order-form .form-group label').removeClass('text-text-light');
+        $('#add-order-form .form-group label').addClass('text-text-dark');
+        $('#add-order-form .form-group select, #add-order-form .form-group input').removeClass('bg-gray-dark text-text-light border-sidebar-hover');
+        $('#add-order-form .form-group select, #add-order-form .form-group input').addClass('bg-gray-50 text-black border-gray-border');
+        $('#add-order-form .form-group select:focus, #add-order-form .form-group input:focus').removeClass('bg-sidebar-menu');
+        $('#add-order-form .form-group select:focus, #add-order-form .form-group input:focus').addClass('bg-white');
+        $('.add-order-toggle').removeClass('bg-teal hover:bg-blue-hover');
+        $('.add-order-toggle').addClass('bg-teal hover:bg-blue-hover');
+    }
 }
 
 // Initialize on Page Load

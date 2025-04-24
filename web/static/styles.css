@@ -1,828 +1,1280 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+*, ::before, ::after {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
 }
+
+::backdrop {
+  --tw-border-spacing-x: 0;
+  --tw-border-spacing-y: 0;
+  --tw-translate-x: 0;
+  --tw-translate-y: 0;
+  --tw-rotate: 0;
+  --tw-skew-x: 0;
+  --tw-skew-y: 0;
+  --tw-scale-x: 1;
+  --tw-scale-y: 1;
+  --tw-pan-x:  ;
+  --tw-pan-y:  ;
+  --tw-pinch-zoom:  ;
+  --tw-scroll-snap-strictness: proximity;
+  --tw-gradient-from-position:  ;
+  --tw-gradient-via-position:  ;
+  --tw-gradient-to-position:  ;
+  --tw-ordinal:  ;
+  --tw-slashed-zero:  ;
+  --tw-numeric-figure:  ;
+  --tw-numeric-spacing:  ;
+  --tw-numeric-fraction:  ;
+  --tw-ring-inset:  ;
+  --tw-ring-offset-width: 0px;
+  --tw-ring-offset-color: #fff;
+  --tw-ring-color: rgb(59 130 246 / 0.5);
+  --tw-ring-offset-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+  --tw-blur:  ;
+  --tw-brightness:  ;
+  --tw-contrast:  ;
+  --tw-grayscale:  ;
+  --tw-hue-rotate:  ;
+  --tw-invert:  ;
+  --tw-saturate:  ;
+  --tw-sepia:  ;
+  --tw-drop-shadow:  ;
+  --tw-backdrop-blur:  ;
+  --tw-backdrop-brightness:  ;
+  --tw-backdrop-contrast:  ;
+  --tw-backdrop-grayscale:  ;
+  --tw-backdrop-hue-rotate:  ;
+  --tw-backdrop-invert:  ;
+  --tw-backdrop-opacity:  ;
+  --tw-backdrop-saturate:  ;
+  --tw-backdrop-sepia:  ;
+  --tw-contain-size:  ;
+  --tw-contain-layout:  ;
+  --tw-contain-paint:  ;
+  --tw-contain-style:  ;
+}
+
+/*
+! tailwindcss v3.4.17 | MIT License | https://tailwindcss.com
+*/
+
+/*
+1. Prevent padding and border from affecting element width. (https://github.com/mozdevs/cssremedy/issues/4)
+2. Allow adding a border to an element by just adding a border-width. (https://github.com/tailwindcss/tailwindcss/pull/116)
+*/
+
+*,
+::before,
+::after {
+  box-sizing: border-box;
+  /* 1 */
+  border-width: 0;
+  /* 2 */
+  border-style: solid;
+  /* 2 */
+  border-color: #e5e7eb;
+  /* 2 */
+}
+
+::before,
+::after {
+  --tw-content: '';
+}
+
+/*
+1. Use a consistent sensible line-height in all browsers.
+2. Prevent adjustments of font size after orientation changes in iOS.
+3. Use a more readable tab size.
+4. Use the user's configured `sans` font-family by default.
+5. Use the user's configured `sans` font-feature-settings by default.
+6. Use the user's configured `sans` font-variation-settings by default.
+7. Disable tap highlights on iOS
+*/
+
+html,
+:host {
+  line-height: 1.5;
+  /* 1 */
+  -webkit-text-size-adjust: 100%;
+  /* 2 */
+  -moz-tab-size: 4;
+  /* 3 */
+  -o-tab-size: 4;
+     tab-size: 4;
+  /* 3 */
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  /* 4 */
+  font-feature-settings: normal;
+  /* 5 */
+  font-variation-settings: normal;
+  /* 6 */
+  -webkit-tap-highlight-color: transparent;
+  /* 7 */
+}
+
+/*
+1. Remove the margin in all browsers.
+2. Inherit line-height from `html` so users can set them as a class directly on the `html` element.
+*/
 
 body {
-    font-family: 'Poppins', sans-serif;
-    background: linear-gradient(135deg, #f0f2f5 0%, #e9ecef 100%);
-    color: #333;
-    overflow-x: hidden;
+  margin: 0;
+  /* 1 */
+  line-height: inherit;
+  /* 2 */
 }
 
-header {
-    background: #1F2A44;
-    color: #fff;
-    padding: 15px 20px;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-    height: 60px; /* Fixed header height */
+/*
+1. Add the correct height in Firefox.
+2. Correct the inheritance of border color in Firefox. (https://bugzilla.mozilla.org/show_bug.cgi?id=190655)
+3. Ensure horizontal rules are visible by default.
+*/
+
+hr {
+  height: 0;
+  /* 1 */
+  color: inherit;
+  /* 2 */
+  border-top-width: 1px;
+  /* 3 */
 }
 
-header h1 {
-    font-size: 1.5rem;
-    margin: 0;
+/*
+Add the correct text decoration in Chrome, Edge, and Safari.
+*/
+
+abbr:where([title]) {
+  -webkit-text-decoration: underline dotted;
+          text-decoration: underline dotted;
 }
 
-header .sidebar-toggle {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 1.5rem;
-    cursor: pointer;
-    transition: transform 0.3s ease;
+/*
+Remove the default font size and weight for headings.
+*/
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-size: inherit;
+  font-weight: inherit;
 }
 
-header .sidebar-toggle:hover {
-    transform: scale(1.1);
+/*
+Reset links to optimize for opt-in styling instead of opt-out.
+*/
+
+a {
+  color: inherit;
+  text-decoration: inherit;
 }
 
-header .theme-toggle {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 1.2rem;
-    cursor: pointer;
-    transition: transform 0.3s ease;
+/*
+Add the correct font weight in Edge and Safari.
+*/
+
+b,
+strong {
+  font-weight: bolder;
 }
 
-header .theme-toggle:hover {
-    transform: scale(1.1);
+/*
+1. Use the user's configured `mono` font-family by default.
+2. Use the user's configured `mono` font-feature-settings by default.
+3. Use the user's configured `mono` font-variation-settings by default.
+4. Correct the odd `em` font sizing in all browsers.
+*/
+
+code,
+kbd,
+samp,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* 1 */
+  font-feature-settings: normal;
+  /* 2 */
+  font-variation-settings: normal;
+  /* 3 */
+  font-size: 1em;
+  /* 4 */
 }
 
-.sidebar {
-    width: 250px;
-    background: #2C3E50;
-    color: #fff;
-    position: fixed;
-    top: 0; /* Start from the very top */
-    left: 0;
-    height: 100vh; /* Full viewport height */
-    padding: 20px;
-    transition: transform 0.3s ease;
-    z-index: 999;
+/*
+Add the correct font size in all browsers.
+*/
+
+small {
+  font-size: 80%;
 }
 
-.sidebar.collapsed {
-    transform: translateX(-100%);
+/*
+Prevent `sub` and `sup` elements from affecting the line height in all browsers.
+*/
+
+sub,
+sup {
+  font-size: 75%;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
 }
 
-.sidebar h2 {
-    font-size: 1.5rem;
-    margin-bottom: 20px;
+sub {
+  bottom: -0.25em;
 }
 
-.sidebar .menu-item {
-    padding: 15px 20px;
-    margin-bottom: 15px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.3s;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 1.2rem;
-    color: #E6F0FA;
-    background: #3A506B;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+sup {
+  top: -0.5em;
 }
 
-.sidebar .menu-item:hover {
-    background: #4A6FA5;
+/*
+1. Remove text indentation from table contents in Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=999088, https://bugs.webkit.org/show_bug.cgi?id=201297)
+2. Correct table border color inheritance in all Chrome and Safari. (https://bugs.chromium.org/p/chromium/issues/detail?id=935729, https://bugs.webkit.org/show_bug.cgi?id=195016)
+3. Remove gaps between table borders by default.
+*/
+
+table {
+  text-indent: 0;
+  /* 1 */
+  border-color: inherit;
+  /* 2 */
+  border-collapse: collapse;
+  /* 3 */
 }
 
-.sidebar .menu-item i {
-    font-size: 1.3rem;
+/*
+1. Change the font styles in all browsers.
+2. Remove the margin in Firefox and Safari.
+3. Remove default padding in all browsers.
+*/
+
+button,
+input,
+optgroup,
+select,
+textarea {
+  font-family: inherit;
+  /* 1 */
+  font-feature-settings: inherit;
+  /* 1 */
+  font-variation-settings: inherit;
+  /* 1 */
+  font-size: 100%;
+  /* 1 */
+  font-weight: inherit;
+  /* 1 */
+  line-height: inherit;
+  /* 1 */
+  letter-spacing: inherit;
+  /* 1 */
+  color: inherit;
+  /* 1 */
+  margin: 0;
+  /* 2 */
+  padding: 0;
+  /* 3 */
 }
 
-.sidebar .sub-menu {
-    display: none;
-    padding-left: 20px;
+/*
+Remove the inheritance of text transform in Edge and Firefox.
+*/
+
+button,
+select {
+  text-transform: none;
 }
 
-.sidebar .sub-menu a {
-    width: 100%;
-    text-align: left;
-    background: #3A506B;
-    border: none;
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 5px;
-    color: #E6F0FA;
-    transition: background 0.3s;
-    display: block;
-    text-decoration: none;
-    font-size: 1rem;
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Remove default button styles.
+*/
+
+button,
+input:where([type='button']),
+input:where([type='reset']),
+input:where([type='submit']) {
+  -webkit-appearance: button;
+  /* 1 */
+  background-color: transparent;
+  /* 2 */
+  background-image: none;
+  /* 2 */
 }
 
-.sidebar .sub-menu a:hover {
-    background: #4A6FA5;
+/*
+Use the modern Firefox focus style for all focusable elements.
+*/
+
+:-moz-focusring {
+  outline: auto;
 }
 
-.hamburger {
-    display: none;
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 1.5rem;
-    cursor: pointer;
+/*
+Remove the additional `:invalid` styles in Firefox. (https://github.com/mozilla/gecko-dev/blob/2f9eacd9d3d995c937b4251a5557d95d494c9be1/layout/style/res/forms.css#L728-L737)
+*/
+
+:-moz-ui-invalid {
+  box-shadow: none;
 }
 
-.main-content {
-    margin-left: 250px;
-    padding: 20px;
-    transition: margin-left 0.3s ease;
-    width: calc(100% - 250px); /* تنظیم عرض با در نظر گرفتن سایدبار */
+/*
+Add the correct vertical alignment in Chrome and Firefox.
+*/
+
+progress {
+  vertical-align: baseline;
 }
 
-.main-content.full-width {
-    margin-left: 0;
-    width: 100%; /* وقتی سایدبار بسته است، عرض کامل */
+/*
+Correct the cursor style of increment and decrement buttons in Safari.
+*/
+
+::-webkit-inner-spin-button,
+::-webkit-outer-spin-button {
+  height: auto;
 }
 
-.filter-section {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-bottom: 20px;
-    align-items: center;
-    background: #fff;
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    animation: fadeIn 0.5s ease-in-out;
-    border: 1px solid #e0e0e0;
-    width: 100%;
-    max-width: 1000px; /* افزایش عرض برای پر کردن فضای خالی */
-    margin-left: auto;
-    margin-right: auto;
+/*
+1. Correct the odd appearance in Chrome and Safari.
+2. Correct the outline style in Safari.
+*/
+
+[type='search'] {
+  -webkit-appearance: textfield;
+  /* 1 */
+  outline-offset: -2px;
+  /* 2 */
 }
 
-.filter-section label {
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #1F2A44;
-    margin-right: 5px;
+/*
+Remove the inner padding in Chrome and Safari on macOS.
+*/
+
+::-webkit-search-decoration {
+  -webkit-appearance: none;
 }
 
-.filter-section select {
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    font-size: 0.9rem;
-    background: #f9fafb;
-    transition: all 0.3s ease;
-    min-width: 120px;
+/*
+1. Correct the inability to style clickable types in iOS and Safari.
+2. Change font properties to `inherit` in Safari.
+*/
+
+::-webkit-file-upload-button {
+  -webkit-appearance: button;
+  /* 1 */
+  font: inherit;
+  /* 2 */
 }
 
-.filter-section select:hover {
-    border-color: #4BC0C0;
+/*
+Add the correct display in Chrome and Safari.
+*/
+
+summary {
+  display: list-item;
 }
 
-.filter-section select:focus {
-    outline: none;
-    border-color: #4BC0C0;
-    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
-    background: #fff;
+/*
+Removes the default spacing and border for appropriate elements.
+*/
+
+blockquote,
+dl,
+dd,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+hr,
+figure,
+p,
+pre {
+  margin: 0;
 }
 
-.filter-section .btn-primary {
-    background: #4BC0C0;
-    border: none;
-    padding: 8px 20px;
-    border-radius: 6px;
-    font-weight: 600;
-    transition: all 0.3s ease;
+fieldset {
+  margin: 0;
+  padding: 0;
 }
 
-.filter-section .btn-primary:hover {
-    background: #36A2EB;
-    transform: scale(1.05);
+legend {
+  padding: 0;
 }
 
-.output-container {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    margin-bottom: 20px;
+ol,
+ul,
+menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-.floating-toolbar {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-    z-index: 1000;
+/*
+Reset default styling for dialogs.
+*/
+
+dialog {
+  padding: 0;
 }
 
-.floating-toolbar button {
-    background: #DC3545;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 5px;
-    color: #fff;
-    transition: background 0.3s, transform 0.2s;
+/*
+Prevent resizing textareas horizontally by default.
+*/
+
+textarea {
+  resize: vertical;
 }
 
-.floating-toolbar button:hover {
-    background: #C82333;
-    transform: scale(1.05);
+/*
+1. Reset the default placeholder opacity in Firefox. (https://github.com/tailwindlabs/tailwindcss/issues/3300)
+2. Set the default placeholder color to the user's configured gray 400 color.
+*/
+
+input::-moz-placeholder, textarea::-moz-placeholder {
+  opacity: 1;
+  /* 1 */
+  color: #9ca3af;
+  /* 2 */
 }
 
-.script-panel {
-    background: #f8f9fa;
-    border-radius: 5px;
-    padding: 15px;
-    margin-bottom: 15px;
-    max-height: 300px;
-    overflow-y: auto;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+input::placeholder,
+textarea::placeholder {
+  opacity: 1;
+  /* 1 */
+  color: #9ca3af;
+  /* 2 */
 }
 
-.script-panel h4 {
-    margin-bottom: 10px;
-    cursor: pointer;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+/*
+Set the default cursor for buttons.
+*/
+
+button,
+[role="button"] {
+  cursor: pointer;
 }
 
-.script-panel .script-output {
-    display: block;
-    margin-top: 10px;
+/*
+Make sure disabled buttons don't get the pointer cursor.
+*/
+
+:disabled {
+  cursor: default;
 }
 
-.script-toolbar {
-    display: flex;
-    gap: 10px;
-    position: sticky;
-    bottom: 0;
-    background: #f8f9fa;
-    padding-top: 10px;
+/*
+1. Make replaced elements `display: block` by default. (https://github.com/mozdevs/cssremedy/issues/14)
+2. Add `vertical-align: middle` to align replaced elements more sensibly by default. (https://github.com/jensimmons/cssremedy/issues/14#issuecomment-634934210)
+   This can trigger a poorly considered lint error in some tools but is included by design.
+*/
+
+img,
+svg,
+video,
+canvas,
+audio,
+iframe,
+embed,
+object {
+  display: block;
+  /* 1 */
+  vertical-align: middle;
+  /* 2 */
 }
 
-.script-toolbar button {
-    background: #DC3545;
-    border: none;
-    padding: 5px 10px;
-    border-radius: 5px;
-    color: #fff;
-    transition: background 0.3s, transform 0.2s;
+/*
+Constrain images and videos to the parent width and preserve their intrinsic aspect ratio. (https://github.com/mozdevs/cssremedy/issues/14)
+*/
+
+img,
+video {
+  max-width: 100%;
+  height: auto;
 }
 
-.script-toolbar button:hover {
-    background: #C82333;
-    transform: scale(1.05);
+/* Make elements with the HTML hidden attribute stay hidden by default */
+
+[hidden]:where(:not([hidden="until-found"])) {
+  display: none;
 }
 
-.card {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    padding: 15px;
-    margin-bottom: 15px;
-    transition: transform 0.2s ease;
+.static {
+  position: static;
 }
 
-.card:hover {
-    transform: translateY(-3px);
+.fixed {
+  position: fixed;
 }
 
-.card h4 {
-    font-size: 1.1rem;
-    margin-top: 0;
-    color: #333;
+.absolute {
+  position: absolute;
 }
 
-.card .btn {
-    margin: 5px;
+.relative {
+  position: relative;
 }
 
-body.report-page {
-    font-family: 'Arial', sans-serif;
-    background-color: #f0f0f0;
-    margin: 0;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    min-height: 100vh;
-    width: 100%;
-    overflow-x: hidden;
+.sticky {
+  position: sticky;
 }
 
-.report-page h1 {
-    color: #1F2A44;
-    animation: slideInDown 0.5s ease-in-out;
+.bottom-5 {
+  bottom: 1.25rem;
 }
 
-.text-center.mb-4 {
-    width: 100%;
-    max-width: 1000px; /* افزایش عرض برای هماهنگی با جدول */
-    margin-left: auto;
-    margin-right: auto;
+.left-0 {
+  left: 0px;
 }
 
-.table-container {
-    overflow-x: auto;
-    white-space: nowrap;
-    position: relative;
-    max-height: 600px;
-    width: 100%;
-    max-width: 1000px; /* افزایش عرض جدول برای پر کردن فضای خالی */
-    margin: 0 auto;
-    animation: slideInUp 0.5s ease-in-out;
-    display: flex;
-    justify-content: center;
+.left-1\/2 {
+  left: 50%;
+}
+
+.top-0 {
+  top: 0px;
+}
+
+.top-1\/2 {
+  top: 50%;
+}
+
+.z-10 {
+  z-index: 10;
+}
+
+.z-\[1000\] {
+  z-index: 1000;
+}
+
+.z-\[999\] {
+  z-index: 999;
+}
+
+.m-0 {
+  margin: 0px;
+}
+
+.m-1 {
+  margin: 0.25rem;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-5 {
+  margin-bottom: 1.25rem;
+}
+
+.ml-\[250px\] {
+  margin-left: 250px;
+}
+
+.mr-2 {
+  margin-right: 0.5rem;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mt-3 {
+  margin-top: 0.75rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mt-5 {
+  margin-top: 1.25rem;
+}
+
+.block {
+  display: block;
+}
+
+.flex {
+  display: flex;
 }
 
 .table {
-    width: 100%;
-    border-collapse: collapse;
-    table-layout: auto;
+  display: table;
 }
 
-.table th, .table td {
-    text-align: center;
-    vertical-align: middle;
-    padding: 8px;
-    font-size: 0.9rem;
-    max-width: 180px; /* افزایش عرض ستون‌ها برای خوانایی بهتر */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+.grid {
+  display: grid;
 }
 
-.table th {
-    background-color: #1F2A44;
-    color: white;
-    position: sticky;
-    top: 0;
-    z-index: 10;
+.hidden {
+  display: none;
 }
 
-.table td {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e0e0e0;
+.h-12 {
+  height: 3rem;
 }
 
-.table tr:hover {
-    background-color: #e9ecef;
-    transition: background-color 0.3s ease;
+.h-\[60px\] {
+  height: 60px;
 }
 
-.table-container .btn {
-    margin: 5px;
+.h-screen {
+  height: 100vh;
 }
 
-.table-container .btn-primary {
-    background-color: #4BC0C0;
-    border-color: #4BC0C0;
+.max-h-0 {
+  max-height: 0px;
 }
 
-.table-container .btn-secondary {
-    background-color: #6c757d;
-    border-color: #6c757d;
+.max-h-\[600px\] {
+  max-height: 600px;
 }
 
-.table-container .btn-primary:hover,
-.table-container .btn-secondary:hover {
-    opacity: 0.8;
-    transform: scale(1.05);
+.min-h-screen {
+  min-height: 100vh;
 }
 
-#loading {
-    display: none;
-    text-align: center;
-    margin-top: 20px;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.7);
-    padding: 20px;
-    border-radius: 10px;
-    color: #fff;
-    z-index: 1000;
+.w-12 {
+  width: 3rem;
 }
 
-#loading .spinner-border {
-    width: 3rem;
-    height: 3rem;
-    border-width: 0.4em;
-    animation: spin 1s linear infinite, pulse 1.5s ease-in-out infinite;
+.w-\[250px\] {
+  width: 250px;
 }
 
-#loading p {
-    margin-top: 10px;
-    font-size: 1.1rem;
+.w-\[calc\(100\%-250px\)\] {
+  width: calc(100% - 250px);
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.w-full {
+  width: 100%;
 }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.5; }
-    100% { opacity: 1; }
+.min-w-\[120px\] {
+  min-width: 120px;
+}
+
+.max-w-4xl {
+  max-width: 56rem;
+}
+
+.max-w-\[180px\] {
+  max-width: 180px;
+}
+
+.table-auto {
+  table-layout: auto;
+}
+
+.border-collapse {
+  border-collapse: collapse;
+}
+
+.-translate-x-1\/2 {
+  --tw-translate-x: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.-translate-y-1\/2 {
+  --tw-translate-y: -50%;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
 }
 
 @keyframes fadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
+  0% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 @keyframes slideInDown {
-    0% { transform: translateY(-20px); opacity: 0; }
-    100% { transform: translateY(0); opacity: 1; }
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slideInDown {
+  animation: slideInDown 0.5s ease-in-out;
 }
 
 @keyframes slideInUp {
-    0% { transform: translateY(20px); opacity: 0; }
-    100% { transform: translateY(0); opacity: 1; }
-}
-
-.dashboard-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px;
-    margin-bottom: 20px;
-}
-
-.chart-card {
-    background: #fff;
-    border-radius: 10px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    padding: 15px;
-    transition: transform 0.2s ease;
-}
-
-.chart-card:hover {
-    transform: translateY(-3px);
-}
-
-.chart-card canvas {
-    max-width: 100%;
-    height: 150px !important;
-}
-
-body.dark-theme {
-    background: linear-gradient(135deg, #1F2A44 0%, #2C3E50 100%);
-    color: #fff;
-}
-
-body.dark-theme header {
-    background: #141C2F;
-}
-
-body.dark-theme .sidebar {
-    background: #1F2A44;
-}
-
-body.dark-theme .sidebar .menu-item {
-    background: #2C3E50;
-}
-
-body.dark-theme .sidebar .menu-item:hover {
-    background: #4A6FA5;
-}
-
-body.dark-theme .output-container,
-body.dark-theme .card,
-body.dark-theme .chart-card {
-    background: #2C3E50;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-body.dark-theme .script-panel {
-    background: #34495E;
-}
-
-body.dark-theme .filter-section {
-    background: #2C3E50;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-    border: 1px solid #4A6FA5;
-}
-
-body.dark-theme .filter-section label {
-    color: #E6F0FA;
-}
-
-body.dark-theme .filter-section select {
-    background: #34495E;
-    color: #E6F0FA;
-    border-color: #4A6FA5;
-}
-
-body.dark-theme .filter-section select:hover {
-    border-color: #4BC0C0;
-}
-
-body.dark-theme .filter-section select:focus {
-    border-color: #4BC0C0;
-    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
-    background: #3A506B;
-}
-
-body.dark-theme .filter-section .btn-primary {
-    background: #4BC0C0;
-}
-
-body.dark-theme .filter-section .btn-primary:hover {
-    background: #36A2EB;
-}
-
-body.dark-theme .report-page h1 {
-    color: #E6F0FA;
-}
-
-body.dark-theme .table th {
-    background-color: #2C3E50;
-}
-
-body.dark-theme .table td {
-    background-color: #34495E;
-    border-bottom: 1px solid #4A6FA5;
-}
-
-body.dark-theme .table tr:hover {
-    background-color: #4A6FA5;
-}
-
-@media (max-width: 768px) {
-    .sidebar {
-        transform: translateX(-100%);
-    }
-
-    .sidebar.collapsed {
-        transform: translateX(0);
-    }
-
-    .main-content {
-        margin-left: 0;
-        width: 100%;
-    }
-
-    .main-content.full-width {
-        margin-left: 0;
-        width: 100%;
-    }
-
-    .hamburger {
-        display: block;
-    }
-
-    .floating-toolbar {
-        justify-content: center;
-    }
-
-    .card .btn {
-        width: 100%;
-        margin: 5px 0;
-    }
-
-    .filter-section {
-        flex-direction: column;
-        align-items: stretch;
-        max-width: 100%;
-        padding: 10px;
-    }
-
-    .filter-section select {
-        width: 100%;
-        margin-bottom: 10px;
-        min-width: unset;
-    }
-
-    .filter-section label {
-        margin-right: 0;
-    }
-
-    .filter-section .btn-primary {
-        width: 100%;
-    }
-
-    .dashboard-grid {
-        grid-template-columns: 1fr;
-    }
-
-    .table-container {
-        max-width: 100%;
-    }
-
-    .table th, .table td {
-        font-size: 0.8rem;
-        padding: 6px;
-        max-width: 100px;
-    }
-}
-
-/* استایل‌های جدید برای فرم Add New Order */
-#add-order-form .card {
-    background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
-    border: 1px solid #e0e0e0;
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.15);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 25px;
-    transition: all 0.3s ease;
-}
-
-#add-order-form .card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
-}
-
-#add-order-form .card h3 {
-    font-size: 1.4rem;
-    color: #1F2A44;
-    margin-bottom: 20px;
-    text-align: center;
-    font-weight: 600;
-}
-
-#add-order-form .form-group {
-    margin-bottom: 20px;
-}
-
-#add-order-form .form-group label {
-    font-weight: 600;
-    font-size: 0.95rem;
-    color: #333;
-    margin-bottom: 8px;
-    display: block;
-}
-
-#add-order-form .form-group select,
-#add-order-form .form-group input {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-    font-size: 0.95rem;
-    background: #f9fafb;
-    transition: all 0.3s ease;
-}
-
-#add-order-form .form-group select:focus,
-#add-order-form .form-group input:focus {
-    outline: none;
-    border-color: #4BC0C0;
-    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
-    background: #fff;
-}
-
-#add-order-form .form-group select:hover,
-#add-order-form .form-group input:hover {
-    border-color: #4BC0C0;
-}
-
-#add-order-form .btn-primary {
-    background: #4BC0C0;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 6px;
-    font-size: 1rem;
-    font-weight: 600;
-    color: #fff;
-    display: block;
-    width: 100%;
-    transition: all 0.3s ease;
-}
-
-#add-order-form .btn-primary:hover {
-    background: #36A2EB;
-    transform: scale(1.02);
-}
-
-#form-message {
-    text-align: center;
-    font-size: 0.95rem;
-    font-weight: 500;
-    padding: 8px;
-    border-radius: 5px;
-    margin-top: 10px;
-}
-
-#form-message span[style*="color: green"] {
-    background: rgba(40, 167, 69, 0.1);
-    color: #28a745;
-    padding: 5px 10px;
-    border-radius: 4px;
-}
-
-#form-message span[style*="color: red"] {
-    background: rgba(220, 53, 69, 0.1);
-    color: #dc3545;
-    padding: 5px 10px;
-    border-radius: 4px;
-}
-
-#form-message span[style*="color: blue"] {
-    background: rgba(54, 162, 235, 0.1);
-    color: #36A2EB;
-    padding: 5px 10px;
-    border-radius: 4px;
-}
-
-/* حالت دارک برای فرم */
-body.dark-theme #add-order-form .card {
-    background: linear-gradient(135deg, #2C3E50 0%, #34495E 100%);
-    border: 1px solid #4A6FA5;
-    box-shadow: 0 6px 25px rgba(0, 0, 0, 0.3);
-}
-
-body.dark-theme #add-order-form .card h3 {
-    color: #E6F0FA;
-}
-
-body.dark-theme #add-order-form .form-group label {
-    color: #E6F0FA;
-}
-
-body.dark-theme #add-order-form .form-group select,
-body.dark-theme #add-order-form .form-group input {
-    background: #34495E;
-    color: #E6F0FA;
-    border-color: #4A6FA5;
-}
-
-body.dark-theme #add-order-form .form-group select:focus,
-body.dark-theme #add-order-form .form-group input:focus {
-    border-color: #4BC0C0;
-    box-shadow: 0 0 8px rgba(75, 192, 192, 0.3);
-    background: #3A506B;
-}
-
-body.dark-theme #add-order-form .form-group select:hover,
-body.dark-theme #add-order-form .form-group input:hover {
-    border-color: #4BC0C0;
-}
-
-body.dark-theme #add-order-form .btn-primary {
-    background: #4BC0C0;
-}
-
-body.dark-theme #add-order-form .btn-primary:hover {
-    background: #36A2EB;
-}
-
-/* استایل‌های جدید برای دکمه Add New Order در هدر */
-header .add-order-toggle {
-    background: #4BC0C0;
-    border: none;
-    padding: 8px 15px;
-    border-radius: 5px;
-    color: #fff;
-    font-size: 1rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-header .add-order-toggle:hover {
-    background: #36A2EB;
-    transform: scale(1.05);
-}
-
-header .add-order-toggle i {
-    font-size: 1.1rem;
-}
-
-/* انیمیشن برای باز و بسته شدن فرم */
-#add-order-section {
+  0% {
+    transform: translateY(20px);
     opacity: 0;
-    max-height: 0;
-    overflow: hidden;
-    transition: opacity 0.5s ease, max-height 0.5s ease;
-}
+  }
 
-#add-order-section.show {
+  100% {
+    transform: translateY(0);
     opacity: 1;
-    max-height: 1000px;
-    overflow: visible;
+  }
 }
 
-/* حالت دارک برای دکمه */
-body.dark-theme header .add-order-toggle {
-    background: #4BC0C0;
+.animate-slideInUp {
+  animation: slideInUp 0.5s ease-in-out;
 }
 
-body.dark-theme header .add-order-toggle:hover {
-    background: #36A2EB;
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.grid-cols-\[repeat\(auto-fit\2c minmax\(300px\2c 1fr\)\)\] {
+  grid-template-columns: repeat(auto-fit,minmax(300px,1fr));
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.gap-3 {
+  gap: 0.75rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-5 {
+  gap: 1.25rem;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.overflow-x-hidden {
+  overflow-x: hidden;
+}
+
+.text-ellipsis {
+  text-overflow: ellipsis;
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+.rounded {
+  border-radius: 0.25rem;
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+.border {
+  border-width: 1px;
+}
+
+.border-4 {
+  border-width: 4px;
+}
+
+.border-none {
+  border-style: none;
+}
+
+.border-gray-border {
+  --tw-border-opacity: 1;
+  border-color: rgb(224 224 224 / var(--tw-border-opacity, 1));
+}
+
+.bg-black\/70 {
+  background-color: rgb(0 0 0 / 0.7);
+}
+
+.bg-blue-100 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(219 234 254 / var(--tw-bg-opacity, 1));
+}
+
+.bg-dark-blue {
+  --tw-bg-opacity: 1;
+  background-color: rgb(31 42 68 / var(--tw-bg-opacity, 1));
+}
+
+.bg-gray-100 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(243 244 246 / var(--tw-bg-opacity, 1));
+}
+
+.bg-gray-50 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(249 250 251 / var(--tw-bg-opacity, 1));
+}
+
+.bg-gray-light {
+  --tw-bg-opacity: 1;
+  background-color: rgb(248 249 250 / var(--tw-bg-opacity, 1));
+}
+
+.bg-green-100 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(220 252 231 / var(--tw-bg-opacity, 1));
+}
+
+.bg-red-100 {
+  --tw-bg-opacity: 1;
+  background-color: rgb(254 226 226 / var(--tw-bg-opacity, 1));
+}
+
+.bg-red-error {
+  --tw-bg-opacity: 1;
+  background-color: rgb(220 53 69 / var(--tw-bg-opacity, 1));
+}
+
+.bg-sidebar-bg {
+  --tw-bg-opacity: 1;
+  background-color: rgb(44 62 80 / var(--tw-bg-opacity, 1));
+}
+
+.bg-sidebar-menu {
+  --tw-bg-opacity: 1;
+  background-color: rgb(58 80 107 / var(--tw-bg-opacity, 1));
+}
+
+.bg-teal {
+  --tw-bg-opacity: 1;
+  background-color: rgb(75 192 192 / var(--tw-bg-opacity, 1));
+}
+
+.bg-transparent {
+  background-color: transparent;
+}
+
+.bg-white {
+  --tw-bg-opacity: 1;
+  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
+}
+
+.bg-gradient-to-br {
+  background-image: linear-gradient(to bottom right, var(--tw-gradient-stops));
+}
+
+.from-light-bg {
+  --tw-gradient-from: #f0f2f5 var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(240 242 245 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.from-white {
+  --tw-gradient-from: #fff var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+
+.to-gray-light {
+  --tw-gradient-to: #f8f9fa var(--tw-gradient-to-position);
+}
+
+.to-light-gray {
+  --tw-gradient-to: #e9ecef var(--tw-gradient-to-position);
+}
+
+.p-2 {
+  padding: 0.5rem;
+}
+
+.p-3 {
+  padding: 0.75rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.p-5 {
+  padding: 1.25rem;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.px-5 {
+  padding-left: 1.25rem;
+  padding-right: 1.25rem;
+}
+
+.py-1 {
+  padding-top: 0.25rem;
+  padding-bottom: 0.25rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.pl-5 {
+  padding-left: 1.25rem;
+}
+
+.text-left {
+  text-align: left;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.align-middle {
+  vertical-align: middle;
+}
+
+.font-poppins {
+  font-family: Poppins, sans-serif;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-blue-hover {
+  --tw-text-opacity: 1;
+  color: rgb(54 162 235 / var(--tw-text-opacity, 1));
+}
+
+.text-dark-blue {
+  --tw-text-opacity: 1;
+  color: rgb(31 42 68 / var(--tw-text-opacity, 1));
+}
+
+.text-green-success {
+  --tw-text-opacity: 1;
+  color: rgb(40 167 69 / var(--tw-text-opacity, 1));
+}
+
+.text-red-error {
+  --tw-text-opacity: 1;
+  color: rgb(220 53 69 / var(--tw-text-opacity, 1));
+}
+
+.text-text-dark {
+  --tw-text-opacity: 1;
+  color: rgb(51 51 51 / var(--tw-text-opacity, 1));
+}
+
+.text-text-light {
+  --tw-text-opacity: 1;
+  color: rgb(230 240 250 / var(--tw-text-opacity, 1));
+}
+
+.text-white {
+  --tw-text-opacity: 1;
+  color: rgb(255 255 255 / var(--tw-text-opacity, 1));
+}
+
+.opacity-0 {
+  opacity: 0;
+}
+
+.shadow-\[0_2px_10px_rgba\(0\2c 0\2c 0\2c 0\.2\)\] {
+  --tw-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  --tw-shadow-colored: 0 2px 10px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.shadow-light {
+  --tw-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  --tw-shadow-colored: 0 4px 15px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.shadow-medium {
+  --tw-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --tw-shadow-colored: 0 4px 20px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.shadow-menu {
+  --tw-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  --tw-shadow-colored: 0 2px 5px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color, text-decoration-color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.duration-200 {
+  transition-duration: 200ms;
+}
+
+.duration-300 {
+  transition-duration: 300ms;
+}
+
+.duration-500 {
+  transition-duration: 500ms;
+}
+
+.hover\:-translate-y-1:hover {
+  --tw-translate-y: -0.25rem;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.hover\:scale-105:hover {
+  --tw-scale-x: 1.05;
+  --tw-scale-y: 1.05;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.hover\:scale-110:hover {
+  --tw-scale-x: 1.1;
+  --tw-scale-y: 1.1;
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.hover\:border-teal:hover {
+  --tw-border-opacity: 1;
+  border-color: rgb(75 192 192 / var(--tw-border-opacity, 1));
+}
+
+.hover\:bg-blue-hover:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(54 162 235 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-gray-200:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(229 231 235 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-red-hover:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(200 35 51 / var(--tw-bg-opacity, 1));
+}
+
+.hover\:bg-sidebar-hover:hover {
+  --tw-bg-opacity: 1;
+  background-color: rgb(74 111 165 / var(--tw-bg-opacity, 1));
+}
+
+.focus\:border-teal:focus {
+  --tw-border-opacity: 1;
+  border-color: rgb(75 192 192 / var(--tw-border-opacity, 1));
+}
+
+.focus\:bg-white:focus {
+  --tw-bg-opacity: 1;
+  background-color: rgb(255 255 255 / var(--tw-bg-opacity, 1));
+}
+
+.focus\:shadow-\[0_0_8px_rgba\(75\2c 192\2c 192\2c 0\.3\)\]:focus {
+  --tw-shadow: 0 0 8px rgba(75,192,192,0.3);
+  --tw-shadow-colored: 0 0 8px var(--tw-shadow-color);
+  box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+}
+
+.focus\:outline-none:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus\:ring-2:focus {
+  --tw-ring-offset-shadow: var(--tw-ring-inset) 0 0 0 var(--tw-ring-offset-width) var(--tw-ring-offset-color);
+  --tw-ring-shadow: var(--tw-ring-inset) 0 0 0 calc(2px + var(--tw-ring-offset-width)) var(--tw-ring-color);
+  box-shadow: var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow, 0 0 #0000);
+}
+
+.focus\:ring-teal:focus {
+  --tw-ring-opacity: 1;
+  --tw-ring-color: rgb(75 192 192 / var(--tw-ring-opacity, 1));
 }

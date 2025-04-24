@@ -10,13 +10,26 @@ import logging
 import hashlib
 import json
 
-app = Flask(__name__)
+# تنظیم دایرکتوری static به صورت نسبی
+# app.py توی Uni_Final/web هست، پس دایرکتوری static توی Uni_Final/web/static قرار داره
+static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+app = Flask(__name__, static_folder=static_path)
 app.config['SECRET_KEY'] = 'your-secret-key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Configure logging
-logging.basicConfig(level=logging.ERROR)  # فقط خطاها لاگ می‌شن
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+# لاگ کردن مسیر دایرکتوری static موقع شروع
+logger.info(f"Static folder set to: {app.static_folder}")
+
+# چک کردن وجود فایل styles.css
+styles_path = os.path.join(app.static_folder, 'styles.css')
+if os.path.exists(styles_path):
+    logger.info("styles.css found in static folder!")
+else:
+    logger.error("styles.css NOT found in static folder! Check the path.")
 
 processes = {}
 stop_reading_flags = {}
@@ -70,6 +83,7 @@ def save_to_db(block):
     conn.commit()
     conn.close()
 
+
 @app.route('/')
 def home():
     return render_template('index.html')
@@ -77,6 +91,18 @@ def home():
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'), 'favicon.ico')
+
+@app.route('/test-static')
+def test_static():
+    # لاگ کردن مسیر دایرکتوری static و فایل styles.css
+    logger.debug(f"Static folder path: {app.static_folder}")
+    styles_path = os.path.join(app.static_folder, 'styles.css')
+    logger.debug(f"Looking for styles.css at: {styles_path}")
+    if os.path.exists(styles_path):
+        logger.debug("styles.css found!")
+    else:
+        logger.debug("styles.css NOT found!")
+    return send_from_directory('static', 'styles.css')
 
 @app.route('/run_script', methods=['POST'])
 def run_script():
@@ -267,22 +293,18 @@ def fetch_data_from_db(db_name, table_name, node_id='', traffic_type='', time_ra
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     db_path = os.path.join(base_dir, 'result', db_name)
     try:
-        # Build the SQL query
         query = f"SELECT * FROM {table_name}"
         conditions = []
         params = []
 
-        # Filter by node_id
         if node_id:
             conditions.append("node_id = ?")
             params.append(node_id)
 
-        # Filter by traffic_type
         if traffic_type:
             conditions.append("traffic_type = ?")
             params.append(traffic_type)
 
-        # Filter by time_range
         if time_range:
             now = datetime.now()
             if time_range == '1h':
@@ -298,18 +320,15 @@ def fetch_data_from_db(db_name, table_name, node_id='', traffic_type='', time_ra
                 conditions.append("timestamp >= ?")
                 params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
 
-        # Filter by network_health
         if network_health:
             conditions.append("network_health = ?")
             params.append(network_health)
 
-        # Combine conditions
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
         query += " ORDER BY timestamp DESC"
 
-        # Execute the query
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         c.execute(query, params)
@@ -341,13 +360,11 @@ def report(report_type):
 
     db_name, table_name = report_map.get(report_type, (None, None))
     if db_name and table_name:
-        # Get filter parameters from the request
         node_id = request.args.get('node_id', '')
         traffic_type = request.args.get('traffic_type', '')
         time_range = request.args.get('time_range', '')
         network_health = request.args.get('network_health', '')
 
-        # Fetch data with filters
         rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
         return render_template('report.html', rows=rows, columns=columns, report_type=report_type)
     else:
@@ -359,27 +376,22 @@ def traffic_data():
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     db_path = os.path.join(base_dir, 'result', 'real_time_orders.db')
     try:
-        # Get filter parameters
         node_id = request.args.get('node_id', '')
         traffic_type = request.args.get('traffic_type', '')
         time_range = request.args.get('time_range', '')
 
-        # Build the SQL query
         query = "SELECT timestamp, traffic_volume, network_health, latency, traffic_type FROM real_time_orders"
         conditions = []
         params = []
 
-        # Filter by node_id
         if node_id:
             conditions.append("node_id = ?")
             params.append(node_id)
 
-        # Filter by traffic_type
         if traffic_type:
             conditions.append("traffic_type = ?")
             params.append(traffic_type)
 
-        # Filter by time_range
         if time_range:
             now = datetime.now()
             if time_range == '1m':
@@ -393,25 +405,21 @@ def traffic_data():
                 conditions.append("timestamp >= ?")
                 params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
 
-        # Combine conditions
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
 
         query += " ORDER BY timestamp DESC LIMIT 10"
 
-        # Execute the query
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
         c.execute(query, params)
         rows = c.fetchall()
         conn.close()
 
-        # لاگ حذف شده
         logger.debug("Fetched rows from DB: %s", rows)
 
         timestamps = [row[0] for row in rows]
         volumes = [min(100, max(0, float(row[1]) + random.uniform(-20, 20))) for row in rows]
-        # Updated health mapping to scale from 0 to 8
         health_map = {'good': 0, 'moderate': 4, 'poor': 8}
         network_health_scores = [min(8, max(0, health_map.get(row[2], 0) + random.uniform(-1, 1))) for row in rows]
         latencies = [min(200, max(0, float(row[3]) + random.uniform(-30, 30))) for row in rows]
@@ -420,11 +428,9 @@ def traffic_data():
         for t in traffic_types:
             type_counts[t] = type_counts.get(t, 0) + 1
 
-        # Normalize type_counts to range 0-10
         max_count = max(type_counts.values(), default=1)
         normalized_type_counts = {t: (count / max_count) * 10 for t, count in type_counts.items()}
 
-        # لاگ حذف شده
         logger.debug("Processed data: %s", {
             'timestamps': timestamps,
             'volumes': volumes,
@@ -446,18 +452,15 @@ def traffic_data():
         logger.error("Database error: %s", str(e))
         return jsonify({'error': str(e)})
 
-# مسیر جدید برای اضافه کردن سفارش
 @app.route('/add_new_order', methods=['POST'])
 def add_new_order():
     try:
-        # دریافت داده‌ها از فرم
         node_id = request.form.get('node_id')
         traffic_type = request.form.get('traffic_type')
         traffic_volume = float(request.form.get('traffic_volume'))
         network_health = request.form.get('network_health')
         latency = float(request.form.get('latency'))
 
-        # اعتبارسنجی
         if not node_id or node_id not in nodes:
             return jsonify({'error': 'Invalid Node ID'})
         if traffic_type not in ["Data", "Stream", "Game"]:
@@ -469,14 +472,12 @@ def add_new_order():
         if latency < 0:
             return jsonify({'error': 'Latency must be positive'})
 
-        # گرفتن آخرین بلاک از دیتابیس
         conn = sqlite3.connect(output_db)
         c = conn.cursor()
         c.execute("SELECT * FROM new_orders ORDER BY timestamp DESC LIMIT 1")
         last_row = c.fetchone()
         conn.close()
 
-        # ایجاد بلاک قبلی
         previous_block = None
         if last_row:
             traffic_layer = {"type": last_row[2], "volume": float(last_row[3])}
@@ -493,10 +494,8 @@ def add_new_order():
             )
             previous_block.hash = last_row[7]
 
-        # ایجاد بلاک جدید (مشابه generate_new_order در code04_blockchain_with_new_orders.py)
         timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
 
-        # تحلیل چندمرحله‌ای برای تراکم
         if traffic_volume > 70:
             level = "High"
             is_congested = 1
@@ -531,7 +530,6 @@ def add_new_order():
             congestion_layer, traffic_suggestion, is_congestion_order
         )
 
-        # ذخیره بلاک در دیتابیس
         save_to_db(new_block)
 
         logger.info(f"New order added: Node {node_id}, Traffic Type {traffic_type}")
@@ -549,4 +547,5 @@ def handle_disconnect():
     logger.info('Client disconnected')
 
 if __name__ == '__main__':
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)  # debug=False برای جلوگیری از لاگ‌های اضافی Flask
+    logger.info("Skipping Tailwind CSS execution as styles.css already exists.")
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
