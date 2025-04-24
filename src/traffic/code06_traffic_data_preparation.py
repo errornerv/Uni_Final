@@ -3,33 +3,36 @@ import os
 import sqlite3
 from tqdm import tqdm
 import sys
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# Database paths
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))  # Go to start/ directory
-input_db = os.path.join(start_dir, "result", "new_orders.db")
-output_file = os.path.join(start_dir, "result", "traffic_data.csv")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "new_orders.db")
+output_file = os.path.join(RESULT_DIR, "traffic_data.csv")
 
-# Function to check if the database file exists
+# تابع بررسی وجود دیتابیس
 def check_db_exists(db_path):
     if not os.path.exists(db_path):
         print(f"Error: Database file {db_path} does not exist.")
         return False
     return True
 
-# Function to load data from the database
-def load_from_db(db_path):
-    # Check if the database exists
+# تابع بارگذاری داده‌ها از دیتابیس
+def load_from_db(db_path, limit=None):
     if not check_db_exists(db_path):
         return []
 
     try:
         conn = sqlite3.connect(db_path)
         c = conn.cursor()
-        c.execute("SELECT * FROM new_orders")
+        query = "SELECT * FROM new_orders"
+        if limit:
+            query += f" LIMIT {limit}"
+        c.execute(query)
         rows = c.fetchall()
         conn.close()
 
@@ -44,7 +47,7 @@ def load_from_db(db_path):
                 "traffic_volume": row[3],
                 "latency": row[5],
                 "network_health": row[4],
-                "is_congested": 1 if row[8] in ["Medium", "High"] else 0,  # Based on congestion_level
+                "is_congested": 1 if row[8] in ["Medium", "High"] else 0,
                 "traffic_type": row[2],
                 "congestion_level": row[8]
             })
@@ -55,14 +58,13 @@ def load_from_db(db_path):
         print(f"Error connecting to database {db_path}: {e}")
         return []
 
-# Function to prepare and save data
+# تابع آماده‌سازی و ذخیره داده‌ها
 def prepare_and_save_data(data, output_path):
     if not data:
         print("No data available to save.")
         return
 
     try:
-        # Ensure the result directory exists
         result_dir = os.path.dirname(output_path)
         if not os.path.exists(result_dir):
             os.makedirs(result_dir)
@@ -72,13 +74,14 @@ def prepare_and_save_data(data, output_path):
         df.to_csv(output_path, index=False)
         print(f"Data successfully saved to {output_path}.")
         print("First 5 rows of the data:")
-        print(df.head())  # Display the first 5 rows
+        print(df.head())
     except Exception as e:
         print(f"Error saving data to {output_path}: {e}")
 
-# Main execution
-if __name__ == "__main__":
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
     print("Starting data preparation process...")
-    chain_data = load_from_db(input_db)
+    chain_data = load_from_db(input_db, limit)
     prepare_and_save_data(chain_data, output_file)
     print("Data preparation process completed.")

@@ -1,3 +1,4 @@
+
 import hashlib
 import os
 import logging
@@ -10,18 +11,19 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import sys
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "new_orders.db")
+output_db = os.path.join(RESULT_DIR, "real_time_orders.db")
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "new_orders.db")
-output_db = os.path.join(start_dir, "result", "real_time_orders.db")
+# تنظیمات لاگینگ
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -35,10 +37,8 @@ node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
 
 # دیتابیس خروجی
 def init_db():
-    result_dir = os.path.dirname(output_db)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-    
+    if not os.path.exists(RESULT_DIR):
+        os.makedirs(RESULT_DIR)
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS real_time_orders
@@ -113,7 +113,6 @@ class TrafficBlock:
             volume = self.traffic_layer["volume"]
             health = self.health_layer["status"]
             neighbors = graph[self.node_id]["neighbors"]
-
             if self.order_type == "Priority":
                 return f"Fast-track {traffic_type} traffic, allocate maximum resources to {self.node_id}"
             elif volume > 70:
@@ -138,7 +137,6 @@ class TrafficBlockchain:
         c = conn.cursor()
         c.execute("SELECT * FROM new_orders")
         rows = c.fetchall()
-        # مرتب‌سازی برای اولویت دادن به بلاک‌های Priority
         priority_blocks = [row for row in rows if row[12] == "Priority"]
         standard_blocks = [row for row in rows if row[12] != "Priority"]
         sorted_rows = priority_blocks + standard_blocks
@@ -153,7 +151,7 @@ class TrafficBlockchain:
             block = TrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, 
                                 traffic_suggestion, order_type, signature)
             block.hash = row[7]
-            if not block.signature:  # برای بلاک‌های قدیمی بدون امضا
+            if not block.signature:
                 block.sign_block(node_keys[row[1]])
             self.chain.append(block)
             if row[1] not in self.cache:
@@ -170,7 +168,7 @@ class TrafficBlockchain:
         order_type = block.order_type
         new_block = TrafficBlock(block.timestamp, block.node_id, block.traffic_layer, block.health_layer,
                                  block.previous_hash, block.congestion_layer, suggestion, order_type)
-        new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
+        new_block.sign_block(node_keys[block.node_id])
         if not new_block.verify_signature(node_public_keys[block.node_id]):
             logging.error(f"Invalid signature for block {new_block.node_id}, block discarded")
             return False
@@ -181,36 +179,34 @@ class TrafficBlockchain:
         if len(self.cache[block.node_id]) > 4:
             self.cache[block.node_id].pop(0)
         save_to_db(new_block)
-        # شبیه‌سازی تأخیر بلادرنگ
-        delay = 0.05 if order_type == "Priority" else 0.1
+        delay = 0.02 if order_type == "Priority" and os.getenv("DEMO_MODE") == "True" else 0.05 if order_type == "Priority" else 0.1
         time.sleep(delay)
         return True
 
-    def generate_report(self):
-        priority_orders = 0
-        total_congested = 0
-        real_time_blocks = 0
-
-        conn = sqlite3.connect(output_db)
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM real_time_orders WHERE order_type = 'Priority'")
-        priority_orders = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM real_time_orders WHERE congestion_level IN ('Medium', 'High')")
-        total_congested = c.fetchone()[0]
-        c.execute("SELECT COUNT(*) FROM real_time_orders")
-        real_time_blocks = c.fetchone()[0]
-        conn.close()
-
-        print("\nReal-Time Orders Report:")
-        print(f"Total Real-Time Blocks Processed: {real_time_blocks}")
-        print(f"Total Priority Orders: {priority_orders}")
-        print(f"Total Congested Points: {total_congested}")
-
-# اجرا
-init_db()
-traffic_blockchain = TrafficBlockchain()
-total_blocks = len(traffic_blockchain.chain[1:])
-for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Real-Time Orders", file=sys.stdout)):
-    traffic_blockchain.add_real_time_block(block)
-    tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}, Delay: {0.05 if block.order_type == 'Priority' else 0.1}s")
-traffic_blockchain.generate_report()
+# تابع اصلی
+def main():
+    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+    init_db()
+    traffic_blockchain = TrafficBlockchain()
+    total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
+    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Real-Time Orders", file=sys.stdout)):
+        traffic_blockchain.add_real_time_block(block)
+        delay = 0.02 if block.order_type == "Priority" and os.getenv("DEMO_MODE") == "True" else 0.05 if block.order_type == "Priority" else 0.1
+        tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}, Delay: {delay}s")
+    # گزارش خلاصه
+    priority_orders = 0
+    total_congested = 0
+    real_time_blocks = 0
+    conn = sqlite3.connect(output_db)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM real_time_orders WHERE order_type = 'Priority'")
+    priority_orders = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM real_time_orders WHERE congestion_level IN ('Medium', 'High')")
+    total_congested = c.fetchone()[0]
+    c.execute("SELECT COUNT(*) FROM real_time_orders")
+    real_time_blocks = c.fetchone()[0]
+    conn.close()
+    print("\nReal-Time Orders Report:")
+    print(f"Total Real-Time Blocks Processed: {real_time_blocks}")
+    print(f"Total Priority Orders: {priority_orders}")
+    print(f"Total Congested Points: {total_congested}")

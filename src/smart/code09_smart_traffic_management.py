@@ -8,23 +8,24 @@ import json
 import logging
 import sys
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 import joblib
-
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس و مدل
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "real_time_orders.db")  # ورودی از code05
-output_db = os.path.join(start_dir, "result", "smart_traffic.db")
-model_file = os.path.join(start_dir, "result", "congestion_model.pkl")
-encoders_file = os.path.join(start_dir, "result", "encoders.pkl")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "real_time_orders.db")
+output_db = os.path.join(RESULT_DIR, "smart_traffic.db")
+model_file = os.path.join(RESULT_DIR, "congestion_model.pkl")
+encoders_file = os.path.join(RESULT_DIR, "encoders.pkl")
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -33,22 +34,14 @@ graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)),
          for node in nodes}
 
 # وضعیت نودها
-node_status = {node: {"max_capacity": 100, "current_traffic": 0, "active": True} for node in nodes}
+node_status = {
+    node: {"max_capacity": 100, "current_traffic": 0, "active": True} if node != "Genesis" 
+    else {"max_capacity": 0, "current_traffic": 0, "active": False} 
+    for node in nodes
+}
 
 # آستانه‌های پویا
 thresholds = {"medium": 40, "high": 70}
-
-# بارگذاری مدل و انکودرها
-try:
-    model = joblib.load(model_file)
-    encoders = joblib.load(encoders_file)
-    le_health = encoders["health"]
-    le_type = encoders["type"]
-    le_level = encoders["level"]
-    logging.info(f"Loaded model from {model_file} and encoders from {encoders_file}")
-except Exception as e:
-    logging.error(f"Failed to load model or encoders: {e}")
-    sys.exit(1)
 
 # کش برای کاهش کوئری‌های دیتابیس
 db_cache = {}
@@ -100,7 +93,7 @@ class SmartTrafficBlock:
         self.congestion_level = congestion_level
         self.traffic_redistribution = traffic_redistribution or "None"
         self.event_type = event_type
-        self.predicted_congestion = predicted_congestion
+        self.predicted_congestion = predicted_congestion or "Unknown"
         self.hash = self.calculate_hash()
 
     def calculate_hash(self):
@@ -112,19 +105,53 @@ class SmartTrafficBlock:
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
+# بارگذاری مدل و انکودرها
+def load_model_and_encoders():
+    try:
+        model = joblib.load(model_file)
+        encoders = joblib.load(encoders_file)
+        le_node_id = encoders["node_id"]
+        le_traffic_type = encoders["traffic_type"]
+        le_network_health = encoders["network_health"]
+        logging.info(f"Loaded model from {model_file} and encoders from {encoders_file}")
+        return model, le_node_id, le_traffic_type, le_network_health
+    except Exception as e:
+        logging.error(f"Failed to load model or encoders: {e}")
+        raise
+
 # پیش‌بینی با مدل ML
-def predict_congestion(block):
+def predict_congestion(block, model, le_node_id, le_traffic_type, le_network_health):
     try:
         data = pd.DataFrame([{
+            "node_id": block.node_id,
             "traffic_volume": block.traffic_layer["volume"],
             "latency": block.health_layer["latency"],
             "network_health": block.health_layer["status"],
             "traffic_type": block.traffic_layer["type"]
         }])
-        data["network_health"] = le_health.transform(data["network_health"])
-        data["traffic_type"] = le_type.transform(data["traffic_type"])
-        prediction = model.predict(data)[0]
-        predicted_level = le_level.inverse_transform([prediction])[0]
+
+        # تبدیل مقادیر متنی به عددی
+        for column in ["node_id", "traffic_type", "network_health"]:
+            if column in ["node_id", "traffic_type", "network_health"]:
+                known_values = set(eval(f"le_{column}").classes_)
+                if data[column].iloc[0] not in known_values:
+                    logging.warning(f"Unknown value in {column}: {data[column].iloc[0]}. Using default value.")
+                    data[column] = known_values.pop()  # استفاده از اولین مقدار شناخته‌شده
+                data[column] = eval(f"le_{column}").transform([data[column].iloc[0]])[0]
+
+        features = data[["node_id", "traffic_volume", "latency", "network_health", "traffic_type"]]
+        prediction = model.predict(features)[0]
+        score = model.decision_function(features)[0]
+
+        # تبدیل پیش‌بینی IsolationForest به سطح تراکم
+        if prediction == -1:
+            if score < -0.1:
+                predicted_level = "High"
+            else:
+                predicted_level = "Medium"
+        else:
+            predicted_level = "Low"
+
         return predicted_level
     except Exception as e:
         logging.error(f"Prediction failed for block {block.node_id}: {e}")
@@ -132,30 +159,36 @@ def predict_congestion(block):
 
 # پخش ترافیک هوشمند
 def redistribute_traffic(node_id, excess_traffic):
-    neighbors = graph[node_id]["neighbors"]
-    available_neighbors = [n for n in neighbors if node_status[n]["active"] and 
-                           node_status[n]["current_traffic"] + excess_traffic / len(neighbors) <= node_status[n]["max_capacity"]]
-    
-    if not available_neighbors:
-        return "No available neighbors"
+    try:
+        neighbors = [n for n in graph[node_id]["neighbors"] if n != "Genesis" and node_status[n]["active"]]
+        available_neighbors = [
+            n for n in neighbors 
+            if node_status[n]["current_traffic"] + excess_traffic / len(neighbors) <= node_status[n]["max_capacity"]
+        ]
+        
+        if not available_neighbors:
+            return "No available neighbors"
 
-    split_traffic = excess_traffic / len(available_neighbors)
-    redistribution = []
-    for neighbor in available_neighbors:
-        node_status[neighbor]["current_traffic"] += split_traffic
-        redistribution.append(f"{split_traffic:.2f} MB/s to {neighbor}")
-    
-    return ", ".join(redistribution)
+        split_traffic = excess_traffic / len(available_neighbors)
+        redistribution = []
+        for neighbor in available_neighbors:
+            node_status[neighbor]["current_traffic"] += split_traffic
+            redistribution.append(f"{split_traffic:.2f} MB/s to {neighbor}")
+        
+        return ", ".join(redistribution)
+    except Exception as e:
+        logging.error(f"Error in redistribute_traffic for node {node_id}: {e}")
+        return "Redistribution failed"
 
 # کلاس بلاک‌چین
 class TrafficBlockchain:
-    def __init__(self):
+    def __init__(self, limit=None):
         self.chain = []
         self.cache = {}
         self.block_history = []
-        self.load_from_db()
+        self.load_from_db(limit)
 
-    def load_from_db(self):
+    def load_from_db(self, limit):
         global db_cache
         if input_db in db_cache:
             rows = db_cache[input_db]
@@ -163,7 +196,10 @@ class TrafficBlockchain:
         else:
             conn = sqlite3.connect(input_db)
             c = conn.cursor()
-            c.execute("SELECT * FROM real_time_orders")
+            query = "SELECT * FROM real_time_orders"
+            if limit:
+                query += f" LIMIT {limit}"
+            c.execute(query)
             rows = c.fetchall()
             conn.close()
             db_cache[input_db] = rows
@@ -187,10 +223,10 @@ class TrafficBlockchain:
             tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
         print(f"Processed {len(rows)} blocks")
 
-    def add_block(self, block):
+    def add_block(self, block, model, le_node_id, le_traffic_type, le_network_health):
         traffic_volume = block.traffic_layer["volume"]
         node_id = block.node_id
-        predicted_congestion = predict_congestion(block)  # پیش‌بینی با مدل ML
+        predicted_congestion = predict_congestion(block, model, le_node_id, le_traffic_type, le_network_health)
         
         if node_status[node_id]["active"]:
             node_status[node_id]["current_traffic"] = traffic_volume
@@ -255,19 +291,21 @@ class TrafficBlockchain:
         print(f"High Congestion Blocks: {high_congestion}")
         print(f"Prediction Accuracy: {accuracy:.2f}% ({accurate_predictions}/{total_blocks} correct)")
 
-# مانیتورینگ هوشمند
-def smart_monitoring():
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
     init_db()
-    traffic_blockchain = TrafficBlockchain()
+    model, le_node_id, le_traffic_type, le_network_health = load_model_and_encoders()
+    traffic_blockchain = TrafficBlockchain(limit)
     last_time = time.time()
 
     for node in nodes:
         node_status[node]["current_traffic"] = 0
-        node_status[node]["active"] = True
+        node_status[node]["active"] = node != "Genesis"
 
     total_blocks = len(traffic_blockchain.chain[1:])
     for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Smart Traffic Blocks", file=sys.stdout)):
-        traffic_blockchain.add_block(block)
+        traffic_blockchain.add_block(block, model, le_node_id, le_traffic_type, le_network_health)
         print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
         print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
               f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
@@ -283,4 +321,8 @@ def smart_monitoring():
     traffic_blockchain.generate_report()
 
 if __name__ == "__main__":
-    smart_monitoring()
+    try:
+        main()
+    except Exception as e:
+        logging.error(f"Error in Step 9: Managing smart traffic...: {e}")
+        raise

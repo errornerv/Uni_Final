@@ -1,3 +1,4 @@
+
 import hashlib
 import os
 import numpy as np
@@ -13,21 +14,22 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import sys
 import random
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "traffic_data.db")
+output_db = os.path.join(RESULT_DIR, "congestion_data.db")
+
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "traffic_data.db")
-output_db = os.path.join(start_dir, "result", "congestion_data.db")
-
 # گراف نودها
-nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]  # اضافه کردن Genesis به نودها
+nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
 graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
                 "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
          for node in nodes}
@@ -38,10 +40,8 @@ node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
 
 # مقداردهی دیتابیس خروجی
 def init_db():
-    result_dir = os.path.dirname(output_db)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-    
+    if not os.path.exists(RESULT_DIR):
+        os.makedirs(RESULT_DIR)
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS congestion_blocks
@@ -133,7 +133,6 @@ class Blockchain:
             health_layer = {"status": row[4], "latency": row[5]}
             block = Block(row[0], row[1], traffic_layer, health_layer, row[6])
             block.hash = row[7]
-            # امضا برای بلاک‌ها (از جمله جنسیس) تولید می‌شه
             block.sign_block(node_keys[row[1]])
             self.chain.append(block)
             if row[1] not in self.cache:
@@ -146,7 +145,6 @@ class Blockchain:
         print(f"Loaded {len(rows)} blocks from {input_db}")
 
     def add_block(self, block):
-        # اعتبارسنجی امضا قبل از اضافه کردن بلاک
         if not block.verify_signature(node_public_keys[block.node_id]):
             logging.error(f"Invalid signature for block {block.node_id}, block discarded")
             return False
@@ -163,12 +161,10 @@ class Blockchain:
         node_blocks = self.cache.get(node_id, [])
         if len(node_blocks) < 4:
             return {"is_congested": 0, "score": 0.0, "impact": 0.0, "level": "Low"}
-
         traffic_values = [b.traffic_layer["volume"] for b in node_blocks]
         current_traffic = traffic_values[-1]
         mean_traffic = np.mean(traffic_values)
         dynamic_threshold = max(40, mean_traffic * 1.2)
-
         if current_traffic > 70:
             level = "High"
             is_congested = 1
@@ -178,43 +174,42 @@ class Blockchain:
         else:
             level = "Low"
             is_congested = 0
-
         congestion_score = np.mean(traffic_values)
         latency_impact = np.mean([b.health_layer["latency"] for b in node_blocks])
-
         return {"is_congested": is_congested, "score": round(congestion_score, 2), "impact": round(latency_impact, 2), "level": level}
 
-# اجرا
-init_db()
-blockchain = Blockchain()
+# تابع اصلی
+def main():
+    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+    init_db()
+    blockchain = Blockchain()
+    total_blocks = len(blockchain.chain[1:]) if not block_limit else min(block_limit, len(blockchain.chain[1:]))
+    
+    def process_block(block):
+        congestion_layer = blockchain.detect_congestion(block.node_id)
+        new_block = Block(block.timestamp, block.node_id, block.traffic_layer, block.health_layer, block.previous_hash, congestion_layer)
+        new_block.hash = block.hash
+        new_block.sign_block(node_keys[block.node_id])
+        if blockchain.add_block(new_block):
+            return new_block
+        return None
 
-def process_block(block):
-    congestion_layer = blockchain.detect_congestion(block.node_id)
-    new_block = Block(block.timestamp, block.node_id, block.traffic_layer, block.health_layer, block.previous_hash, congestion_layer)
-    new_block.hash = block.hash
-    new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
-    if blockchain.add_block(new_block):
-        return new_block
-    return None
+    with ThreadPoolExecutor() as executor:
+        blocks_to_process = blockchain.chain[1:total_blocks + 1] if block_limit else blockchain.chain[1:]
+        new_blocks = list(tqdm(executor.map(process_block, blocks_to_process), total=total_blocks, desc="Detecting Congestion", file=sys.stdout))
+        for idx, block in enumerate(new_blocks):
+            if block:
+                tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
 
-# پردازش بلاک‌ها با نوار پیشرفت
-total_blocks = len(blockchain.chain[1:])
-with ThreadPoolExecutor() as executor:
-    new_blocks = list(tqdm(executor.map(process_block, blockchain.chain[1:]), total=total_blocks, desc="Detecting Congestion", file=sys.stdout))
-    for idx, block in enumerate(new_blocks):
-        if block:
-            tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
-
-# گزارش خلاصه
-conn = sqlite3.connect(output_db)
-c = conn.cursor()
-c.execute("SELECT COUNT(*) FROM congestion_blocks WHERE congestion_level = 'High'")
-high_congestion = c.fetchone()[0]
-c.execute("SELECT AVG(congestion_score) FROM congestion_blocks")
-avg_score = c.fetchone()[0] or 0.0
-conn.close()
-
-print("\nCongestion Summary:")
-print(f"Total Blocks: {len(blockchain.chain)}")
-print(f"High Congestion Points: {high_congestion}")
-print(f"Average Congestion Score: {avg_score:.2f}")
+    # گزارش خلاصه
+    conn = sqlite3.connect(output_db)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM congestion_blocks WHERE congestion_level = 'High'")
+    high_congestion = c.fetchone()[0]
+    c.execute("SELECT AVG(congestion_score) FROM congestion_blocks")
+    avg_score = c.fetchone()[0] or 0.0
+    conn.close()
+    print("\nCongestion Summary:")
+    print(f"Total Blocks: {len(blockchain.chain)}")
+    print(f"High Congestion Points: {high_congestion}")
+    print(f"Average Congestion Score: {avg_score:.2f}")

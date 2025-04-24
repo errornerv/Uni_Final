@@ -1,127 +1,129 @@
-import os
-import threading
 import logging
-import time
+import os
+import sys
+from datetime import datetime
+from pathlib import Path
+import matplotlib.pyplot as plt
 import sqlite3
-from tqdm import tqdm  # اضافه کردن tqdm
+import pandas as pd
 
-# تنظیمات لاج‌گیری
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# تنظیمات لاگینگ
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-# وارد کردن ماژول‌های بلاک‌چین
-from blockchain.code01_blockchain_initial_data import init_db as init_blockchain_db
-from blockchain.code02_blockchain_congestion_improved import Blockchain as CongestionBlockchain
-from blockchain.code03_blockchain_managed_traffic import TrafficBlockchain
-from blockchain.code04_blockchain_with_new_orders import NewOrderBlock, generate_new_order, add_new_orders
-from blockchain.code05_blockchain_with_real_time_orders import RealTimeBlock, generate_simulated_traffic, predict_congestion, generate_traffic_suggestion
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+sys.path.append(str(ROOT_DIR))
 
-# وارد کردن ماژول‌های هوش مصنوعی و آموزش داده‌ها
-from traffic.code07_model_training import load_data_from_db, prepare_data, train_and_save_model
-from traffic.code08_advanced_traffic_report import AdvancedTrafficAnalyzer
+# وارد کردن ماژول‌های پروژه
+from src.blockchain.code01_blockchain_initial_data import main as run_initial_data
+from src.blockchain.code02_blockchain_congestion_improved import main as run_congestion
+from src.blockchain.code03_blockchain_managed_traffic import main as run_managed_traffic
+from src.blockchain.code04_blockchain_with_new_orders import main as run_new_orders
+from src.blockchain.code05_blockchain_with_real_time_orders import main as run_real_time_orders
+from src.traffic.code06_traffic_data_preparation import main as run_data_preparation
+from src.traffic.code07_model_training import main as run_model_training
+from src.traffic.code08_advanced_traffic_report import main as run_advanced_report
+from src.smart.code09_smart_traffic_management import main as run_smart_traffic
+from src.smart.code10_self_healing_network import main as run_self_healing
+from src.smart.code11_resource_optimization import main as run_resource_optimization
+from src.smart.code12_predictive_analysis_and_anomaly_detection import main as run_predictive_analysis
 
-# وارد کردن ماژول‌های مدیریت هوشمند
-from smart.code09_smart_traffic_management import smart_monitoring
-from smart.self_healing_network import healing_monitoring
+# اطمینان از وجود دایرکتوری result
+def ensure_result_dir():
+    if not RESULT_DIR.exists():
+        RESULT_DIR.mkdir()
+        logger.info("Created result directory")
 
-# مسیر دیتابیس‌ها
-current_dir = os.path.dirname(os.path.abspath(__file__))
-input_db = os.path.join(current_dir, "result", "traffic_data.db")
-new_orders_db = os.path.join(current_dir, "result", "new_orders.db")
-model_file = os.path.join(current_dir, "result", "congestion_model.pkl")
+# بررسی وجود فایل‌های موردنیاز
+def check_file_exists(file_path, step_name):
+    if not os.path.exists(file_path):
+        logger.error(f"Required file {file_path} for {step_name} does not exist. Skipping step.")
+        return False
+    return True
 
-# مقداردهی اولیه دیتابیس‌ها
-def initialize_databases():
+# تولید نمودار برای دمو
+def plot_summary():
     try:
-        init_blockchain_db()  # مقداردهی دیتابیس اولیه بلاک‌چین
-        conn = sqlite3.connect(new_orders_db)
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS new_orders
-                     (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
-                      latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, congestion_score REAL,
-                      latency_impact REAL, traffic_suggestion TEXT, is_congestion_order INTEGER)''')
-        conn.commit()
+        conn = sqlite3.connect(RESULT_DIR / "predictive_analysis.db")
+        df = pd.read_sql_query("SELECT congestion_level, predicted_congestion, anomaly_detected FROM predictive_analysis", conn)
         conn.close()
-        logging.info("دیتابیس‌ها با موفقیت مقداردهی اولیه شدند.")
-    except sqlite3.Error as e:
-        logging.error(f"خطا در مقداردهی دیتابیس: {e}")
-
-# آموزش مدل
-def train_model():
-    try:
-        df = load_data_from_db(new_orders_db)
-        if df.empty:
-            logging.warning("داده‌ای برای آموزش مدل وجود ندارد. ابتدا داده‌ها را تولید کنید.")
-            return
-        X, y, encoders = prepare_data(df)
-        for _ in tqdm(range(1), desc="Training model"):  # اضافه کردن tqdm
-            train_and_save_model(X, y, model_file)
-        logging.info("مدل با موفقیت آموزش داده شد و ذخیره شد.")
+        if not df.empty:
+            plt.figure(figsize=(8, 6))
+            levels = df['congestion_level'].value_counts()
+            plt.subplot(1, 2, 1)
+            plt.bar(levels.index, levels.values, color=['green', 'orange', 'red'])
+            plt.title("Congestion Level Distribution")
+            plt.xlabel("Congestion Level")
+            plt.ylabel("Count")
+            
+            anomalies = df['anomaly_detected'].value_counts()
+            plt.subplot(1, 2, 2)
+            plt.bar(['Normal', 'Anomaly'], anomalies.values, color=['blue', 'red'])
+            plt.title("Anomaly Detection")
+            plt.ylabel("Count")
+            
+            plt.tight_layout()
+            plt.savefig(RESULT_DIR / "traffic_summary.png")
+            plt.show()
     except Exception as e:
-        logging.error(f"خطا در آموزش مدل: {e}")
+        logger.warning(f"Failed to generate summary plot: {e}")
 
-# تولید گزارش‌های پیشرفته
-def generate_reports():
-    try:
-        analyzer = AdvancedTrafficAnalyzer()
-        for _ in tqdm(range(1), desc="Generating reports"):  # اضافه کردن tqdm
-            analyzer.generate_advanced_report()
-        logging.info("گزارش‌های پیشرفته با موفقیت تولید شدند.")
-    except Exception as e:
-        logging.error(f"خطا در تولید گزارش: {e}")
+# اجرای کل پروژه
+def run_pipeline(demo=False):
+    logger.info("Starting Network Traffic Congestion Management with AI and Blockchain...")
+    start_time = datetime.now()
 
-# اجرای مانیتورینگ هوشمند
-def start_smart_monitoring():
-    try:
-        smart_monitoring()
-        logging.info("مانیتورینگ هوشمند شروع شد.")
-    except Exception as e:
-        logging.error(f"خطا در مانیتورینگ هوشمند: {e}")
+    ensure_result_dir()
+    if demo:
+        logger.info("Running in DEMO mode with reduced data")
+        os.environ["DEMO_MODE"] = "True"
 
-# اجرای مانیتورینگ خود-ترمیم
-def start_healing_monitoring():
-    try:
-        healing_monitoring()
-        logging.info("مانیتورینگ خود-ترمیم شروع شد.")
-    except Exception as e:
-        logging.error(f"خطا در مانیتورینگ خود-ترمیم: {e}")
+    steps = [
+        ("Step 1: Initializing blockchain data...", run_initial_data, None),
+        ("Step 2: Detecting congestion...", run_congestion, None),
+        ("Step 3: Managing traffic...", run_managed_traffic, RESULT_DIR / "traffic_data.db"),
+        ("Step 4: Processing new orders...", run_new_orders, RESULT_DIR / "managed_traffic.db"),
+        ("Step 5: Processing real-time orders...", run_real_time_orders, RESULT_DIR / "new_orders.db"),
+        ("Step 6: Preparing traffic data...", run_data_preparation, RESULT_DIR / "new_orders.db"),
+        ("Step 7: Training machine learning model...", run_model_training, RESULT_DIR / "new_orders.db"),
+        ("Step 8: Generating advanced traffic report...", run_advanced_report, RESULT_DIR / "managed_traffic.db"),
+        ("Step 9: Managing smart traffic...", run_smart_traffic, RESULT_DIR / "congestion_model.pkl"),
+        ("Step 10: Self-healing network...", run_self_healing, RESULT_DIR / "smart_traffic.db"),
+        ("Step 11: Optimizing resources...", run_resource_optimization, RESULT_DIR / "self_healing.db"),
+        ("Step 12: Predictive analysis and anomaly detection...", run_predictive_analysis, RESULT_DIR / "congestion_model.pkl"),
+    ]
 
-# مثال استفاده از بلاک‌چین
-def example_blockchain_usage():
-    try:
-        blockchain = CongestionBlockchain()
-        blockchain.load_from_db()
-        for block in tqdm(blockchain.chain, desc="Loading blockchain data"):  # اضافه کردن tqdm
-            print(f"بلاک: {block.timestamp}, نود: {block.node_id}, ازدحام: {block.congestion_layer['level']}")
-        logging.info("داده‌های بلاک‌چین با موفقیت بارگذاری و نمایش داده شدند.")
-    except Exception as e:
-        logging.error(f"خطا در استفاده از بلاک‌چین: {e}")
+    for step_message, step_function, required_file in steps:
+        try:
+            if required_file and not check_file_exists(required_file, step_message):
+                continue
+            logger.info(step_message)
+            step_function()
+        except Exception as e:
+            logger.error(f"Error in {step_message}: {e}")
+            if demo:
+                logger.info("Continuing in DEMO mode despite error...")
+                continue
+            else:
+                sys.exit(1)
 
-# اجرای اصلی
+    end_time = datetime.now()
+    logger.info(f"Pipeline completed in {end_time - start_time}")
+
+    if demo:
+        logger.info("Generating demo summary plot...")
+        plot_summary()
+
+# تابع اصلی
+def main():
+    demo = "--demo" in sys.argv
+    run_pipeline(demo=demo)
+
 if __name__ == "__main__":
-    logging.info("شروع اجرای پروژه...")
-    
-    # مقداردهی اولیه دیتابیس‌ها
-    initialize_databases()
-    
-    # مثال استفاده از بلاک‌چین
-    example_blockchain_usage()
-    
-    # آموزش مدل (فقط اگه داده وجود داشته باشه)
-    train_model()
-    
-    # تولید گزارش‌ها
-    generate_reports()
-    
-    # اجرای مانیتورینگ‌ها در نخ‌های جداگانه
-    smart_monitor_thread = threading.Thread(target=start_smart_monitoring, daemon=True)
-    healing_monitor_thread = threading.Thread(target=start_healing_monitoring, daemon=True)
-    
-    smart_monitor_thread.start()
-    healing_monitor_thread.start()
-    
-    # منتظر بمون تا برنامه با Ctrl+C متوقف بشه
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logging.info("برنامه با موفقیت متوقف شد.")
+    main()

@@ -5,19 +5,19 @@ import sqlite3
 import random
 from tqdm import tqdm
 import sys
-
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))  # به دایرکتوری start/ بروید
-input_db = os.path.join(start_dir, "result", "managed_traffic.db")
-output_db = os.path.join(start_dir, "result", "traffic_report.db")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "managed_traffic.db")
+output_db = os.path.join(RESULT_DIR, "traffic_report.db")
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)]
@@ -27,7 +27,6 @@ graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)),
 
 # دیتابیس گزارش
 def init_db():
-    # اطمینان از وجود پوشه result
     result_dir = os.path.dirname(output_db)
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -49,16 +48,19 @@ def save_report_to_db(report_type, node_id, value, details):
 
 # کلاس تحلیل
 class AdvancedTrafficAnalyzer:
-    def __init__(self):
+    def __init__(self, limit=None):
         self.chain = []
-        self.cache = {}  # کش برای داده‌های نودها
-        self.load_from_db()
+        self.cache = {}
+        self.load_from_db(limit)
 
-    def load_from_db(self):
+    def load_from_db(self, limit):
         try:
             conn = sqlite3.connect(input_db)
             c = conn.cursor()
-            c.execute("SELECT * FROM managed_blocks")
+            query = "SELECT * FROM managed_blocks"
+            if limit:
+                query += f" LIMIT {limit}"
+            c.execute(query)
             rows = c.fetchall()
             total_rows = len(rows)
             for idx, row in enumerate(tqdm(rows, desc="Loading blocks from DB", file=sys.stdout)):
@@ -72,7 +74,7 @@ class AdvancedTrafficAnalyzer:
                 if block["node_id"] not in self.cache:
                     self.cache[block["node_id"]] = []
                 self.cache[block["node_id"]].append(block)
-                if len(self.cache[block["node_id"]]) > 10:  # نگه‌داری 10 بلاک اخیر
+                if len(self.cache[block["node_id"]]) > 10:
                     self.cache[block["node_id"]].pop(0)
                 tqdm.write(f"Processed {idx + 1}/{total_rows} blocks - Loaded block for Node {block['node_id']} at {block['timestamp']}")
             conn.close()
@@ -156,12 +158,14 @@ class AdvancedTrafficAnalyzer:
             print(f"{health}: {stats['congestion_percentage']}% congested ({stats['total_blocks']} blocks)")
 
         print("\nHigh Traffic Nodes (Traffic > 50 MB/s):")
-        for node in high_traffic_nodes[:10]:  # نمایش 10 مورد
+        for node in high_traffic_nodes[:10]:
             print(node)
 
         logging.info(f"Advanced traffic report saved to: {output_db}")
 
-# اجرا
-init_db()
-analyzer = AdvancedTrafficAnalyzer()
-analyzer.generate_advanced_report()
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+    init_db()
+    analyzer = AdvancedTrafficAnalyzer(limit)
+    analyzer.generate_advanced_report()

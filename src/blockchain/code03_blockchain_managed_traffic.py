@@ -1,38 +1,57 @@
-import hashlib
 import os
-import logging
+import random
+import hashlib
+import time
 import sqlite3
 import json
-import random
-from tqdm import tqdm
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.backends import default_backend
+import logging
+from datetime import datetime
 import sys
+from tqdm import tqdm
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "congestion_data.db")
-output_db = os.path.join(start_dir, "result", "managed_traffic.db")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "traffic_data.db")
+output_db = os.path.join(RESULT_DIR, "managed_traffic.db")
+
+# اسم جدول ورودی
+INPUT_TABLE_NAME = "blocks"
 
 # گراف نودها
-nodes = [f"Node_{i}" for i in range(1, 11)]
-graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
+nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
+graph = {node: {"neighbors": random.sample([n for n in nodes if n != node], random.randint(1, 3)), 
                 "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
          for node in nodes}
 
-# تولید کلیدهای ECDSA
-node_keys = {node: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
-node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
+# وضعیت نودها (شامل Genesis)
+node_status = {
+    node: {"max_capacity": 100, "current_traffic": 0, "active": True} if node != "Genesis" 
+    else {"max_capacity": 0, "current_traffic": 0, "active": False} 
+    for node in nodes
+}
 
-# دیتابیس خروجی
+# بررسی وجود جدول
+def check_table_exists(db_path, table_name):
+    try:
+        conn = sqlite3.connect(db_path)
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+        result = c.fetchone()
+        conn.close()
+        return result is not None
+    except sqlite3.Error as e:
+        logging.error(f"Error checking table {table_name}: {e}")
+        return False
+
+# دیتابیس SQLite
 def init_db():
     result_dir = os.path.dirname(output_db)
     if not os.path.exists(result_dir):
@@ -42,26 +61,25 @@ def init_db():
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS managed_blocks
                  (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
-                  latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, congestion_score REAL,
-                  latency_impact REAL, traffic_suggestion TEXT, signature TEXT)''')
+                  latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, 
+                  congestion_score REAL, latency_impact REAL, traffic_suggestion TEXT)''')
     conn.commit()
     conn.close()
-    print(f"Output database initialized at {output_db}")
 
 def save_to_db(block):
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
-    c.execute("INSERT INTO managed_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO managed_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
               (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
                block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
-               block.traffic_suggestion, block.signature.hex() if block.signature else None))
+               block.congestion_layer["level"], block.congestion_layer["score"], 
+               block.congestion_layer["impact"], block.traffic_suggestion))
     conn.commit()
     conn.close()
 
 # کلاس بلاک
-class TrafficBlock:
-    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer, traffic_suggestion=None, signature=None):
+class ManagedTrafficBlock:
+    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer, traffic_suggestion):
         self.timestamp = timestamp
         self.node_id = node_id
         self.traffic_layer = traffic_layer
@@ -70,134 +88,155 @@ class TrafficBlock:
         self.congestion_layer = congestion_layer
         self.traffic_suggestion = traffic_suggestion
         self.hash = self.calculate_hash()
-        self.signature = signature
 
     def calculate_hash(self):
         block_string = json.dumps({
-            "timestamp": self.timestamp,
-            "node_id": self.node_id,
-            "traffic_layer": self.traffic_layer,
-            "health_layer": self.health_layer,
-            "previous_hash": self.previous_hash,
-            "congestion_layer": self.congestion_layer,
+            "timestamp": self.timestamp, "node_id": self.node_id, "traffic_layer": self.traffic_layer,
+            "health_layer": self.health_layer, "previous_hash": self.previous_hash, "congestion_layer": self.congestion_layer,
             "traffic_suggestion": self.traffic_suggestion
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-    def sign_block(self, private_key):
-        try:
-            message = self.hash.encode()
-            self.signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
-            return True
-        except Exception as e:
-            logging.error(f"Signing failed for {self.node_id}: {e}")
-            return False
+# پخش ترافیک
+def redistribute_traffic(node_id, excess_traffic):
+    try:
+        neighbors = [n for n in graph[node_id]["neighbors"] if n != "Genesis" and node_status[n]["active"]]
+        available_neighbors = [
+            n for n in neighbors 
+            if node_status[n]["current_traffic"] + excess_traffic / len(neighbors) <= node_status[n]["max_capacity"]
+        ]
+        
+        if not available_neighbors:
+            return "No available neighbors"
 
-    def verify_signature(self, public_key):
-        try:
-            if not self.signature:
-                logging.error(f"No signature found for block {self.node_id}")
-                return False
-            public_key.verify(self.signature, self.hash.encode(), ec.ECDSA(hashes.SHA256()))
-            return True
-        except Exception as e:
-            logging.error(f"Signature verification failed for {self.node_id}: {e}")
-            return False
+        split_traffic = excess_traffic / len(available_neighbors)
+        redistribution = []
+        for neighbor in available_neighbors:
+            node_status[neighbor]["current_traffic"] += split_traffic
+            redistribution.append(f"{split_traffic:.2f} MB/s to {neighbor}")
+        
+        return ", ".join(redistribution)
+    except Exception as e:
+        logging.error(f"Error in redistribute_traffic for node {node_id}: {e}")
+        return "Redistribution failed"
 
-    def suggest_traffic_management(self):
-        if self.congestion_layer["is_congested"] == 1:
-            traffic_type = self.traffic_layer["type"]
-            volume = self.traffic_layer["volume"]
-            health = self.health_layer["status"]
-            neighbors = graph[self.node_id]["neighbors"]
+# محاسبه سطح تراکم
+def calculate_congestion_level(traffic_volume, latency, max_capacity):
+    try:
+        # محاسبه امتیاز تراکم بر اساس حجم ترافیک و تأخیر
+        congestion_score = (traffic_volume / max_capacity) * 0.7 + (latency / 10) * 0.3  # فرمول ترکیبی
+        congestion_score = min(max(congestion_score, 0.0), 1.0)  # محدود کردن به بازه 0 تا 1
+        
+        # محاسبه تأثیر تأخیر
+        latency_impact = (latency / 10) * (traffic_volume / max_capacity)  # تأخیر نسبی
+        latency_impact = min(max(latency_impact, 0.0), 1.0)  # محدود کردن به بازه 0 تا 1
+        
+        # تعیین سطح تراکم
+        if congestion_score > 0.8:
+            level = "High"
+        elif congestion_score > 0.5:
+            level = "Medium"
+        else:
+            level = "Low"
 
-            if volume > 70:
-                return f"Redirect {traffic_type} traffic to {random.choice(neighbors)} or limit bandwidth by 50%"
-            elif health == "Down":
-                return f"Increase monitoring for {traffic_type}, reroute to {random.choice(neighbors)}"
-            elif health == "Delayed":
-                return f"Optimize {traffic_type} routing, reduce load by 30%"
-            else:
-                return f"Reduce {traffic_type} traffic by 20% or prioritize critical nodes"
-        return None
+        return {"level": level, "score": congestion_score, "impact": latency_impact}
+    except Exception as e:
+        logging.error(f"Error in calculate_congestion_level: {e}")
+        return {"level": "Low", "score": 0.0, "impact": 0.0}
+
+# پیشنهاد مدیریت ترافیک
+def suggest_traffic_management(block):
+    try:
+        if block.node_id == "Genesis":
+            return "None"
+
+        traffic_volume = block.traffic_layer["volume"]
+        congestion_level = block.congestion_layer["level"]
+        max_capacity = node_status[block.node_id]["max_capacity"]
+
+        if congestion_level in ["Medium", "High"] and traffic_volume > max_capacity:
+            excess_traffic = traffic_volume - max_capacity
+            redistributed = redistribute_traffic(block.node_id, excess_traffic)
+            node_status[block.node_id]["current_traffic"] = max_capacity
+            return f"Redistribute {excess_traffic:.2f} MB/s: {redistributed}"
+        elif congestion_level == "High":
+            return "Reduce Data traffic by 20% or prioritize critical nodes"
+        elif block.health_layer["status"] == "Down":
+            return "Reroute traffic to backup node"
+        return "None"
+    except Exception as e:
+        logging.error(f"Error in suggest_traffic_management for node {block.node_id}: {e}")
+        return "Error in traffic suggestion"
 
 # کلاس بلاک‌چین
 class TrafficBlockchain:
-    def __init__(self):
+    def __init__(self, limit=None):
         self.chain = []
+        self.processed_blocks = []
         self.cache = {}
-        self.load_from_db()
+        self.load_from_db(limit)
 
-    def load_from_db(self):
-        conn = sqlite3.connect(input_db)
-        c = conn.cursor()
-        c.execute("SELECT * FROM congestion_blocks")
-        rows = c.fetchall()
-        for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
-            traffic_layer = {"volume": row[3], "type": row[2]}
-            health_layer = {"status": row[4], "latency": row[5]}
-            congestion_layer = {"is_congested": 1 if row[8] in ["Medium", "High"] else 0, 
-                               "score": row[9], "impact": row[10], "level": row[8]}
-            signature = bytes.fromhex(row[11]) if len(row) > 11 and row[11] else None
-            block = TrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, signature=signature)
-            block.hash = row[7]
-            if not block.signature:  # برای بلاک‌های قدیمی بدون امضا
-                block.sign_block(node_keys[row[1]])
-            self.chain.append(block)
-            if row[1] not in self.cache:
-                self.cache[row[1]] = []
-            self.cache[row[1]].append(block)
-            if len(self.cache[row[1]]) > 4:
-                self.cache[row[1]].pop(0)
-            tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
-        conn.close()
-        print(f"Loaded {len(rows)} blocks from {input_db}")
+    def load_from_db(self, limit):
+        try:
+            if not check_table_exists(input_db, INPUT_TABLE_NAME):
+                logging.error(f"Table '{INPUT_TABLE_NAME}' does not exist in the database")
+                self.chain = []
+                return
 
-    def add_managed_block(self, block):
-        suggestion = block.suggest_traffic_management()
-        new_block = TrafficBlock(block.timestamp, block.node_id, block.traffic_layer, block.health_layer,
-                                 block.previous_hash, block.congestion_layer, suggestion)
-        new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
-        if not new_block.verify_signature(node_public_keys[block.node_id]):
-            logging.error(f"Invalid signature for block {new_block.node_id}, block discarded")
-            return False
-        self.chain.append(new_block)
+            conn = sqlite3.connect(input_db)
+            c = conn.cursor()
+            query = f"SELECT * FROM {INPUT_TABLE_NAME}"
+            if limit:
+                query += f" LIMIT {limit}"
+            c.execute(query)
+            rows = c.fetchall()
+            for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
+                traffic_layer = {"volume": float(row[3] or 0.0), "type": row[2] or "Data"}
+                health_layer = {"status": row[4] or "Normal", "latency": float(row[5] or 0.0)}
+                # محاسبه سطح تراکم
+                max_capacity = node_status.get(row[1], {"max_capacity": 100})["max_capacity"]
+                congestion_layer = calculate_congestion_level(traffic_layer["volume"], health_layer["latency"], max_capacity)
+                try:
+                    traffic_suggestion = row[11] if len(row) > 11 else "None"
+                except IndexError:
+                    traffic_suggestion = "None"
+                block = ManagedTrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, traffic_suggestion)
+                block.hash = row[7]
+                self.chain.append(block)
+                if row[1] not in self.cache:
+                    self.cache[row[1]] = []
+                self.cache[row[1]].append(block)
+                if len(self.cache[row[1]]) > 4:
+                    self.cache[row[1]].pop(0)
+                tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
+            conn.close()
+        except sqlite3.Error as e:
+            logging.error(f"Database load error: {e}")
+            self.chain = []
+
+    def add_block(self, block):
+        traffic_suggestion = suggest_traffic_management(block)
+        new_block = ManagedTrafficBlock(
+            block.timestamp, block.node_id, block.traffic_layer, block.health_layer, 
+            block.previous_hash, block.congestion_layer, traffic_suggestion
+        )
+        self.processed_blocks.append(new_block)
         if block.node_id not in self.cache:
             self.cache[block.node_id] = []
         self.cache[block.node_id].append(new_block)
         if len(self.cache[block.node_id]) > 4:
             self.cache[block.node_id].pop(0)
         save_to_db(new_block)
-        return True
 
-    def generate_report(self):
-        congested_nodes = {}
-        total_congested = 0
-        peak_hours_congestion = 0
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+    init_db()
+    traffic_blockchain = TrafficBlockchain(limit)
 
-        conn = sqlite3.connect(output_db)
-        c = conn.cursor()
-        c.execute("SELECT node_id, COUNT(*) FROM managed_blocks WHERE congestion_level IN ('Medium', 'High') GROUP BY node_id")
-        for row in c.fetchall():
-            congested_nodes[row[0]] = row[1]
-            total_congested += row[1]
+    for block in tqdm(traffic_blockchain.chain, desc="Managing Traffic", file=sys.stdout):
+        traffic_blockchain.add_block(block)
+        print(f"Processed block - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
 
-        c.execute("SELECT COUNT(*) FROM managed_blocks WHERE congestion_level IN ('Medium', 'High') AND SUBSTR(timestamp, 12, 2) BETWEEN '08' AND '17'")
-        peak_hours_congestion = c.fetchone()[0]
-        conn.close()
-
-        print("\nManaged Traffic Report:")
-        print(f"Total Congested Points: {total_congested}")
-        print("Congested Nodes Distribution:")
-        for node, count in congested_nodes.items():
-            print(f"Node {node}: {count} congested points")
-        print(f"Peak Hours Congested Points (8-18): {peak_hours_congestion}")
-
-# اجرا
-init_db()
-traffic_blockchain = TrafficBlockchain()
-total_blocks = len(traffic_blockchain.chain[1:])
-for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Managing Traffic", file=sys.stdout)):
-    traffic_blockchain.add_managed_block(block)
-    tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Suggestion: {block.suggest_traffic_management()}")
-traffic_blockchain.generate_report()
+if __name__ == "__main__":
+    main()

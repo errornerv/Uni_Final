@@ -11,18 +11,19 @@ from tqdm import tqdm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "self_healing.db")  # ورودی از code10
-output_db = os.path.join(start_dir, "result", "optimized_resources.db")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "self_healing.db")
+output_db = os.path.join(RESULT_DIR, "optimized_resources.db")
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -121,7 +122,6 @@ def optimize_resources(block, chain):
     health = block.health_layer["status"]
     neighbors = graph[node_id]["neighbors"]
 
-    # شناسایی نودهای پرترافیک (بر اساس میانگین ترافیک)
     traffic_by_node = {}
     for b in chain:
         if b.node_id not in traffic_by_node:
@@ -131,13 +131,11 @@ def optimize_resources(block, chain):
     avg_traffic = {node: sum(volumes) / len(volumes) if volumes else 0 for node, volumes in traffic_by_node.items()}
     high_traffic_nodes = [node for node, avg in avg_traffic.items() if avg > 50]
 
-    # تخصیص منابع
     if "Priority" in block.traffic_layer["type"]:
-        extra_bandwidth = 30  # تخصیص پهنای باند بیشتر برای تراکنش‌های Priority
+        extra_bandwidth = 30
         node_status[node_id]["allocated_bandwidth"] += extra_bandwidth
         return f"Allocated {extra_bandwidth} MB/s extra bandwidth due to Priority traffic"
     elif predicted_congestion in ["High", "Medium"] and node_id in high_traffic_nodes:
-        # کاهش پهنای باند نود پرترافیک و تخصیص به نودهای سالم
         healthy_neighbors = [n for n in neighbors if node_status[n]["active"] and node_status[n]["current_traffic"] < node_status[n]["max_capacity"]]
         if healthy_neighbors:
             reduced_bandwidth = 20
@@ -149,7 +147,6 @@ def optimize_resources(block, chain):
         else:
             return "Reduced 20 MB/s bandwidth due to high congestion, no healthy neighbors available"
     elif health == "Down":
-        # تخصیص منابع به نودهای سالم‌تر
         healthy_neighbors = [n for n in neighbors if node_status[n]["active"] and node_status[n]["current_traffic"] < node_status[n]["max_capacity"]]
         if healthy_neighbors:
             extra_bandwidth = 10
@@ -160,15 +157,18 @@ def optimize_resources(block, chain):
 
 # کلاس بلاک‌چین
 class TrafficBlockchain:
-    def __init__(self):
+    def __init__(self, limit=None):
         self.chain = []
         self.cache = {}
-        self.load_from_db()
+        self.load_from_db(limit)
 
-    def load_from_db(self):
+    def load_from_db(self, limit):
         conn = sqlite3.connect(input_db)
         c = conn.cursor()
-        c.execute("SELECT * FROM healing_network")
+        query = "SELECT * FROM healing_network"
+        if limit:
+            query += f" LIMIT {limit}"
+        c.execute(query)
         rows = c.fetchall()
         for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
             traffic_layer = {"volume": row[3], "type": row[2]}
@@ -229,10 +229,11 @@ class TrafficBlockchain:
         print(f"Total Resource Allocations: {resource_allocations}")
         print(f"High Traffic Nodes: {', '.join(high_traffic_nodes)}")
 
-# مانیتورینگ بهینه‌سازی منابع
-def resource_optimization():
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
     init_db()
-    traffic_blockchain = TrafficBlockchain()
+    traffic_blockchain = TrafficBlockchain(limit)
     last_time = time.time()
 
     for node in nodes:
@@ -251,6 +252,3 @@ def resource_optimization():
         last_time = time.time()
 
     traffic_blockchain.generate_report()
-
-if __name__ == "__main__":
-    resource_optimization()

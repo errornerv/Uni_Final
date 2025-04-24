@@ -1,3 +1,4 @@
+
 import hashlib
 import os
 import logging
@@ -9,18 +10,19 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
 import sys
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "managed_traffic.db")
+output_db = os.path.join(RESULT_DIR, "new_orders.db")
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "managed_traffic.db")
-output_db = os.path.join(start_dir, "result", "new_orders.db")
+# تنظیمات لاگینگ
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -34,10 +36,8 @@ node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
 
 # دیتابیس خروجی
 def init_db():
-    result_dir = os.path.dirname(output_db)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-    
+    if not os.path.exists(RESULT_DIR):
+        os.makedirs(RESULT_DIR)
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS new_orders
@@ -112,7 +112,6 @@ class TrafficBlock:
             volume = self.traffic_layer["volume"]
             health = self.health_layer["status"]
             neighbors = graph[self.node_id]["neighbors"]
-
             if traffic_type == "Priority":
                 return f"Prioritize {traffic_type} traffic, allocate maximum bandwidth to {self.node_id}"
             elif volume > 70:
@@ -144,14 +143,13 @@ class TrafficBlockchain:
                                "score": row[9], "impact": row[10], "level": row[8]}
             traffic_suggestion = row[11]
             signature = bytes.fromhex(row[12]) if len(row) > 12 and row[12] else None
-            # تعیین نوع تراکنش Priority به‌صورت تصادفی در شرایط ازدحام
             order_type = "Priority" if row[8] in ["Medium", "High"] and random.random() < 0.3 else "Standard"
             if order_type == "Priority":
-                traffic_layer["type"] = "Priority"  # تغییر نوع تراکنش به Priority
+                traffic_layer["type"] = "Priority"
             block = TrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, 
                                 traffic_suggestion, order_type, signature)
             block.hash = row[7]
-            if not block.signature:  # برای بلاک‌های قدیمی بدون امضا
+            if not block.signature:
                 block.sign_block(node_keys[row[1]])
             self.chain.append(block)
             if row[1] not in self.cache:
@@ -168,7 +166,7 @@ class TrafficBlockchain:
         order_type = block.order_type
         new_block = TrafficBlock(block.timestamp, block.node_id, block.traffic_layer, block.health_layer,
                                  block.previous_hash, block.congestion_layer, suggestion, order_type)
-        new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
+        new_block.sign_block(node_keys[block.node_id])
         if not new_block.verify_signature(node_public_keys[block.node_id]):
             logging.error(f"Invalid signature for block {new_block.node_id}, block discarded")
             return False
@@ -181,33 +179,31 @@ class TrafficBlockchain:
         save_to_db(new_block)
         return True
 
-    def generate_report(self):
-        priority_orders = 0
-        congested_nodes = {}
-        total_congested = 0
-
-        conn = sqlite3.connect(output_db)
-        c = conn.cursor()
-        c.execute("SELECT COUNT(*) FROM new_orders WHERE order_type = 'Priority'")
-        priority_orders = c.fetchone()[0]
-        c.execute("SELECT node_id, COUNT(*) FROM new_orders WHERE congestion_level IN ('Medium', 'High') GROUP BY node_id")
-        for row in c.fetchall():
-            congested_nodes[row[0]] = row[1]
-            total_congested += row[1]
-        conn.close()
-
-        print("\nNew Orders Report:")
-        print(f"Total Priority Orders: {priority_orders}")
-        print(f"Total Congested Points: {total_congested}")
-        print("Congested Nodes Distribution:")
-        for node, count in congested_nodes.items():
-            print(f"Node {node}: {count} congested points")
-
-# اجرا
-init_db()
-traffic_blockchain = TrafficBlockchain()
-total_blocks = len(traffic_blockchain.chain[1:])
-for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Orders", file=sys.stdout)):
-    traffic_blockchain.add_ordered_block(block)
-    tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}")
-traffic_blockchain.generate_report()
+# تابع اصلی
+def main():
+    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+    init_db()
+    traffic_blockchain = TrafficBlockchain()
+    total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
+    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Orders", file=sys.stdout)):
+        traffic_blockchain.add_ordered_block(block)
+        tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}")
+    # گزارش خلاصه
+    priority_orders = 0
+    congested_nodes = {}
+    total_congested = 0
+    conn = sqlite3.connect(output_db)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM new_orders WHERE order_type = 'Priority'")
+    priority_orders = c.fetchone()[0]
+    c.execute("SELECT node_id, COUNT(*) FROM new_orders WHERE congestion_level IN ('Medium', 'High') GROUP BY node_id")
+    for row in c.fetchall():
+        congested_nodes[row[0]] = row[1]
+        total_congested += row[1]
+    conn.close()
+    print("\nNew Orders Report:")
+    print(f"Total Priority Orders: {priority_orders}")
+    print(f"Total Congested Points: {total_congested}")
+    print("Congested Nodes Distribution:")
+    for node, count in congested_nodes.items():
+        print(f"Node {node}: {count} congested points")

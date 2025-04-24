@@ -1,3 +1,4 @@
+
 import hashlib
 import json
 import os
@@ -11,14 +12,19 @@ import sqlite3
 import random
 from tqdm import tqdm
 import sys
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+db_file = os.path.join(RESULT_DIR, "traffic_data.db")
+
 # تنظیمات اولیه
 np.random.seed(42)
 num_nodes = 10
-time_steps = 40  # برای حدود 400 بلاک
 start_time = datetime(2025, 2, 27, 7, 0, 0)
 congestion_prob = 0.15
 
@@ -26,11 +32,10 @@ congestion_prob = 0.15
 class Node:
     def __init__(self, node_id, capacity):
         self.node_id = node_id
-        self.capacity = capacity  # ظرفیت نود (مثلاً پهنای باند یا توان پردازش)
-        self.history = 0  # تعداد بلاک‌های موفق اعتبارسنجی‌شده
+        self.capacity = capacity
+        self.history = 0
 
     def update_history(self):
-        """افزایش تاریخچه بعد از اعتبارسنجی موفق"""
         self.history += 1
 
 # گراف نودها
@@ -46,15 +51,9 @@ node_keys = {node.node_id: ec.generate_private_key(ec.SECP256R1(), default_backe
 node_public_keys = {node_id: key.public_key() for node_id, key in node_keys.items()}
 
 # دیتابیس SQLite
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-db_file = os.path.join(start_dir, "result", "traffic_data.db")
-
 def init_db():
-    result_dir = os.path.dirname(db_file)
-    if not os.path.exists(result_dir):
-        os.makedirs(result_dir)
-    
+    if not os.path.exists(RESULT_DIR):
+        os.makedirs(RESULT_DIR)
     conn = sqlite3.connect(db_file)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS blocks
@@ -117,7 +116,7 @@ class Blockchain:
     def __init__(self):
         self.chain = []
         self.cache = {"latest_hash": "0"}
-        self.nodes = nodes  # اضافه کردن لیست نودها به بلاکچین
+        self.nodes = nodes
         self.create_genesis_block()
 
     def create_genesis_block(self):
@@ -132,14 +131,13 @@ class Blockchain:
         return self.chain[-1]
 
     def proof_of_stake(self, node_id):
-        """انتخاب اعتبارسنج با وزن‌دهی بر اساس ظرفیت و تاریخچه"""
-        weights = [node.capacity + node.history * 10 for node in self.nodes]  # وزن = ظرفیت + 10 * تاریخچه
+        weights = [node.capacity + node.history * 10 for node in self.nodes]
         total_weight = sum(weights)
         if total_weight == 0:
             return False
         selected_node = random.choices(self.nodes, weights=weights, k=1)[0]
         if selected_node.node_id == node_id:
-            selected_node.update_history()  # به‌روزرسانی تاریخچه نود انتخاب‌شده
+            selected_node.update_history()
             return True
         return False
 
@@ -149,7 +147,7 @@ class Blockchain:
         while not self.proof_of_stake(node_id):
             nonce += 1
             block.nonce = nonce
-            block.hash = block.calculate_hash()  # اصلاح: استفاده از متد calculate_hash بلاک
+            block.hash = block.calculate_hash()
             if time.time() - start_time > 5:
                 print(f"Timeout for block at {block.timestamp} for {node_id}")
                 return False
@@ -167,7 +165,6 @@ def simulate_traffic(node_id, timestamp):
     peak_prob = 0.3 if 8 <= hour < 18 else 0.05
     traffic_types = ["Data", "Stream", "Game"]
     traffic_type = random.choice(traffic_types)
-
     if np.random.random() < (congestion_prob * peak_prob):
         traffic = np.random.uniform(80, 150)
         health = "Delayed" if np.random.random() < 0.5 else "Down"
@@ -175,7 +172,6 @@ def simulate_traffic(node_id, timestamp):
         traffic = np.random.uniform(1, 60)
         health = "Normal"
     latency = np.random.uniform(0.1, 10)
-
     return {"type": traffic_type, "volume": traffic, "health": health, "latency": latency}
 
 def create_block(traffic_data, previous_hash, node_id):
@@ -184,32 +180,30 @@ def create_block(traffic_data, previous_hash, node_id):
         traffic_data["health"], traffic_data["latency"], previous_hash
     )
 
-# تولید داده‌ها
-init_db()
-blockchain = Blockchain()
-
-tasks = [(t, node.node_id) for t in range(time_steps) for node in nodes]
-random.shuffle(tasks)
-
-total_tasks = len(tasks)
-for idx, (t, node_id) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
-    timestamp = start_time + timedelta(seconds=t * 5)
-    traffic_data = simulate_traffic(node_id, timestamp)
-    previous_hash = blockchain.cache["latest_hash"]
-    block = create_block(traffic_data, previous_hash, node_id)
-    if blockchain.add_block(block, node_id):
-        tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node_id}, Traffic: {traffic_data['volume']:.2f} MB/s")
-
-# نمایش خلاصه
-conn = sqlite3.connect(db_file)
-c = conn.cursor()
-c.execute("SELECT COUNT(*) FROM blocks WHERE traffic_volume > 70")
-congested = c.fetchone()[0]
-c.execute("SELECT AVG(traffic_volume) FROM blocks")
-avg_traffic = c.fetchone()[0]
-conn.close()
-
-print("\nData Summary:")
-print(f"Total Blocks: {len(blockchain.chain)}")
-print(f"Congested Points (>70 MB/s): {congested}")
-print(f"Average Traffic: {avg_traffic:.2f} MB/s")
+# تابع اصلی
+def main():
+    time_steps = 10 if os.getenv("DEMO_MODE") == "True" else 40
+    init_db()
+    blockchain = Blockchain()
+    tasks = [(t, node.node_id) for t in range(time_steps) for node in nodes]
+    random.shuffle(tasks)
+    total_tasks = len(tasks)
+    for idx, (t, node_id) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
+        timestamp = start_time + timedelta(seconds=t * 5)
+        traffic_data = simulate_traffic(node_id, timestamp)
+        previous_hash = blockchain.cache["latest_hash"]
+        block = create_block(traffic_data, previous_hash, node_id)
+        if blockchain.add_block(block, node_id):
+            tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node_id}, Traffic: {traffic_data['volume']:.2f} MB/s")
+    # گزارش خلاصه
+    conn = sqlite3.connect(db_file)
+    c = conn.cursor()
+    c.execute("SELECT COUNT(*) FROM blocks WHERE traffic_volume > 70")
+    congested = c.fetchone()[0]
+    c.execute("SELECT AVG(traffic_volume) FROM blocks")
+    avg_traffic = c.fetchone()[0]
+    conn.close()
+    print("\nData Summary:")
+    print(f"Total Blocks: {len(blockchain.chain)}")
+    print(f"Congested Points (>70 MB/s): {congested}")
+    print(f"Average Traffic: {avg_traffic:.2f} MB/s")

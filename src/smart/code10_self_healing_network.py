@@ -11,18 +11,19 @@ from tqdm import tqdm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.backends import default_backend
+from pathlib import Path
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# تنظیمات لاج‌گیری
+# تنظیمات لاگینگ
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس
-current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "smart_traffic.db")  # ورودی از code09
-output_db = os.path.join(start_dir, "result", "self_healing.db")
+# مسیر ریشه پروژه
+ROOT_DIR = Path(__file__).resolve().parent.parent.parent
+RESULT_DIR = ROOT_DIR / "result"
+input_db = os.path.join(RESULT_DIR, "smart_traffic.db")
+output_db = os.path.join(RESULT_DIR, "self_healing.db")
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -130,38 +131,33 @@ def redistribute_traffic(node_id, excess_traffic):
 
 # محاسبه احتمال فعال‌سازی مجدد نود
 def calculate_reactivation_probability(node_id, chain):
-    # داده‌های تاریخی: تعداد بلاک‌های موفق اخیر (سلامت "Up")
-    node_blocks = [b for b in chain if b.node_id == node_id][-10:]  # 10 بلاک آخر
+    node_blocks = [b for b in chain if b.node_id == node_id][-10:]
     if not node_blocks:
-        return 0.1  # پیش‌فرض
+        return 0.1
     
     up_blocks = sum(1 for b in node_blocks if b.health_layer["status"] == "Up")
     up_ratio = up_blocks / len(node_blocks)
     
-    # سلامت همسایه‌ها
     neighbors = graph[node_id]["neighbors"]
     healthy_neighbors = sum(1 for n in neighbors if any(b.health_layer["status"] == "Up" for b in chain if b.node_id == n))
     neighbor_health_ratio = healthy_neighbors / len(neighbors) if neighbors else 0
     
-    # احتمال فعال‌سازی: ترکیبی از سلامت نود و همسایه‌ها
-    probability = 0.1 + (up_ratio * 0.4) + (neighbor_health_ratio * 0.3)  # حداکثر 80%
+    probability = 0.1 + (up_ratio * 0.4) + (neighbor_health_ratio * 0.3)
     return min(probability, 0.8)
 
 # مکانیزم خود-ترمیمی
 def self_heal(block, chain):
     health = block.health_layer["status"]
-    congestion = block.predicted_congestion  # استفاده از پیش‌بینی مدل ML
+    congestion = block.predicted_congestion
     node_id = block.node_id
     neighbors = graph[node_id]["neighbors"]
     
-    # پیدا کردن نودهای همسایه سالم
     healthy_neighbors = []
     for neighbor in neighbors:
         neighbor_blocks = [b for b in chain if b.node_id == neighbor]
         if neighbor_blocks and neighbor_blocks[-1].health_layer["status"] == "Up":
             healthy_neighbors.append(neighbor)
     
-    # فعال‌سازی مجدد نود غیرفعال
     healing_action = "None"
     if not node_status[node_id]["active"]:
         reactivation_prob = calculate_reactivation_probability(node_id, chain)
@@ -171,7 +167,6 @@ def self_heal(block, chain):
             block.health_layer["latency"] = random.uniform(0, 5)
             healing_action = f"Node reactivated with probability {reactivation_prob:.2f}"
     
-    # خود-ترمیمی بر اساس وضعیت
     if congestion in ["High", "Medium"] and healthy_neighbors:
         return f"Reroute traffic to healthy neighbor {random.choice(healthy_neighbors)} due to predicted {congestion} congestion", healing_action
     elif health == "Down" and healthy_neighbors:
@@ -182,15 +177,18 @@ def self_heal(block, chain):
 
 # کلاس بلاک‌چین
 class TrafficBlockchain:
-    def __init__(self):
+    def __init__(self, limit=None):
         self.chain = []
         self.cache = {}
-        self.load_from_db()
+        self.load_from_db(limit)
 
-    def load_from_db(self):
+    def load_from_db(self, limit):
         conn = sqlite3.connect(input_db)
         c = conn.cursor()
-        c.execute("SELECT * FROM smart_traffic")
+        query = "SELECT * FROM smart_traffic"
+        if limit:
+            query += f" LIMIT {limit}"
+        c.execute(query)
         rows = c.fetchall()
         for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
             traffic_layer = {"volume": row[3], "type": row[2]}
@@ -259,10 +257,11 @@ class TrafficBlockchain:
         print(f"High Congestion Blocks: {high_congestion}")
         print(f"Total Self-Heal Actions Taken: {self_heal_actions}")
 
-# مانیتورینگ خود-ترمیم
-def healing_monitoring():
+# تابع اصلی
+def main():
+    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
     init_db()
-    traffic_blockchain = TrafficBlockchain()
+    traffic_blockchain = TrafficBlockchain(limit)
     last_time = time.time()
 
     for node in nodes:
@@ -280,6 +279,3 @@ def healing_monitoring():
         last_time = time.time()
 
     traffic_blockchain.generate_report()
-
-if __name__ == "__main__":
-    healing_monitoring()
