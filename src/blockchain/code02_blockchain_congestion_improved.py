@@ -8,8 +8,11 @@ import sqlite3
 import json
 from concurrent.futures import ThreadPoolExecutor
 import time
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.backends import default_backend
 import sys
-
+import random
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
@@ -23,6 +26,16 @@ start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
 input_db = os.path.join(start_dir, "result", "traffic_data.db")
 output_db = os.path.join(start_dir, "result", "congestion_data.db")
 
+# گراف نودها
+nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]  # اضافه کردن Genesis به نودها
+graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
+                "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
+         for node in nodes}
+
+# تولید کلیدهای ECDSA
+node_keys = {node: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
+node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
+
 # مقداردهی دیتابیس خروجی
 def init_db():
     result_dir = os.path.dirname(output_db)
@@ -34,7 +47,7 @@ def init_db():
     c.execute('''CREATE TABLE IF NOT EXISTS congestion_blocks
                  (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
                   latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT,
-                  congestion_score REAL, latency_impact REAL)''')
+                  congestion_score REAL, latency_impact REAL, signature TEXT)''')
     conn.commit()
     conn.close()
     print(f"Output database initialized at {output_db}")
@@ -44,10 +57,11 @@ def save_to_db(block, retries=5, delay=1):
         try:
             conn = sqlite3.connect(output_db)
             c = conn.cursor()
-            c.execute("INSERT INTO congestion_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            c.execute("INSERT INTO congestion_blocks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                       (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
                        block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-                       block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"]))
+                       block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
+                       block.signature.hex() if block.signature else None))
             conn.commit()
             conn.close()
             break
@@ -61,7 +75,7 @@ def save_to_db(block, retries=5, delay=1):
 
 # کلاس بلاک با لایه‌ها
 class Block:
-    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer=None):
+    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer=None, signature=None):
         self.timestamp = timestamp
         self.node_id = node_id
         self.traffic_layer = traffic_layer
@@ -69,6 +83,7 @@ class Block:
         self.previous_hash = previous_hash
         self.congestion_layer = congestion_layer or {"is_congested": 0, "score": 0.0, "impact": 0.0, "level": "Low"}
         self.hash = self.calculate_hash()
+        self.signature = signature
 
     def calculate_hash(self):
         block_string = json.dumps({
@@ -80,6 +95,26 @@ class Block:
             "congestion_layer": self.congestion_layer
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
+
+    def sign_block(self, private_key):
+        try:
+            message = self.hash.encode()
+            self.signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signing failed for {self.node_id}: {e}")
+            return False
+
+    def verify_signature(self, public_key):
+        try:
+            if not self.signature:
+                logging.error(f"No signature found for block {self.node_id}")
+                return False
+            public_key.verify(self.signature, self.hash.encode(), ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signature verification failed for {self.node_id}: {e}")
+            return False
 
 # کلاس بلاک‌چین
 class Blockchain:
@@ -98,6 +133,8 @@ class Blockchain:
             health_layer = {"status": row[4], "latency": row[5]}
             block = Block(row[0], row[1], traffic_layer, health_layer, row[6])
             block.hash = row[7]
+            # امضا برای بلاک‌ها (از جمله جنسیس) تولید می‌شه
+            block.sign_block(node_keys[row[1]])
             self.chain.append(block)
             if row[1] not in self.cache:
                 self.cache[row[1]] = []
@@ -109,6 +146,10 @@ class Blockchain:
         print(f"Loaded {len(rows)} blocks from {input_db}")
 
     def add_block(self, block):
+        # اعتبارسنجی امضا قبل از اضافه کردن بلاک
+        if not block.verify_signature(node_public_keys[block.node_id]):
+            logging.error(f"Invalid signature for block {block.node_id}, block discarded")
+            return False
         self.chain.append(block)
         if block.node_id not in self.cache:
             self.cache[block.node_id] = []
@@ -116,6 +157,7 @@ class Blockchain:
         if len(self.cache[block.node_id]) > 4:
             self.cache[block.node_id].pop(0)
         save_to_db(block)
+        return True
 
     def detect_congestion(self, node_id):
         node_blocks = self.cache.get(node_id, [])
@@ -150,15 +192,18 @@ def process_block(block):
     congestion_layer = blockchain.detect_congestion(block.node_id)
     new_block = Block(block.timestamp, block.node_id, block.traffic_layer, block.health_layer, block.previous_hash, congestion_layer)
     new_block.hash = block.hash
-    blockchain.add_block(new_block)
-    return new_block
+    new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
+    if blockchain.add_block(new_block):
+        return new_block
+    return None
 
 # پردازش بلاک‌ها با نوار پیشرفت
 total_blocks = len(blockchain.chain[1:])
 with ThreadPoolExecutor() as executor:
     new_blocks = list(tqdm(executor.map(process_block, blockchain.chain[1:]), total=total_blocks, desc="Detecting Congestion", file=sys.stdout))
     for idx, block in enumerate(new_blocks):
-        tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
+        if block:
+            tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
 
 # گزارش خلاصه
 conn = sqlite3.connect(output_db)

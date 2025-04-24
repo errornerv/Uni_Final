@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, send_file
 from flask_socketio import SocketIO
 import subprocess
 import os
@@ -9,9 +9,15 @@ from datetime import datetime, timedelta
 import logging
 import hashlib
 import json
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet
+import pandas as pd
+import io
+from pathlib import Path  # اضافه کردن pathlib برای مدیریت مسیرها
 
 # تنظیم دایرکتوری static به صورت نسبی
-# app.py توی Uni_Final/web هست، پس دایرکتوری static توی Uni_Final/web/static قرار داره
 static_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
 app = Flask(__name__, static_folder=static_path)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -21,10 +27,8 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-# لاگ کردن مسیر دایرکتوری static موقع شروع
 logger.info(f"Static folder set to: {app.static_folder}")
 
-# چک کردن وجود فایل styles.css
 styles_path = os.path.join(app.static_folder, 'styles.css')
 if os.path.exists(styles_path):
     logger.info("styles.css found in static folder!")
@@ -34,17 +38,20 @@ else:
 processes = {}
 stop_reading_flags = {}
 
-# گراف نودها (از code04_blockchain_with_new_orders.py)
+# گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)]
 graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
                 "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
          for node in nodes}
 
-# مسیر دیتابیس (از code04_blockchain_with_new_orders.py)
-base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-output_db = os.path.join(base_dir, 'result', 'new_orders.db')
+# مسیر دیتابیس‌ها با استفاده از pathlib
+base_dir = Path(__file__).resolve().parent.parent
+output_db = base_dir / 'result' / 'new_orders.db'
+real_time_db = base_dir / 'result' / 'real_time_orders.db'
+predictive_db = base_dir / 'result' / 'predictive_analysis.db'
+traffic_report_db = base_dir / 'result' / 'traffic_report.db'
 
-# کلاس NewOrderBlock (از code04_blockchain_with_new_orders.py)
+# کلاس NewOrderBlock
 class NewOrderBlock:
     def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer=None, 
                  traffic_suggestion=None, is_congestion_order=False):
@@ -57,6 +64,8 @@ class NewOrderBlock:
         self.traffic_suggestion = traffic_suggestion
         self.is_congestion_order = is_congestion_order
         self.hash = self.calculate_hash()
+        # تولید signature به صورت هگزادسیمال
+        self.signature = self.calculate_signature()
 
     def calculate_hash(self):
         block_string = json.dumps({
@@ -71,18 +80,21 @@ class NewOrderBlock:
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-# تابع ذخیره در دیتابیس (از code04_blockchain_with_new_orders.py)
+    def calculate_signature(self):
+        # تولید یه امضای ساده با استفاده از هش بلوک
+        signature_input = (self.hash + str(self.timestamp)).encode()
+        return hashlib.sha256(signature_input).hexdigest()
+
 def save_to_db(block):
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
-    c.execute("INSERT INTO new_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO new_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
               (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
                block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
                block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
-               block.traffic_suggestion, 1 if block.is_congestion_order else 0))
+               block.traffic_suggestion, 1 if block.is_congestion_order else 0, block.signature))
     conn.commit()
     conn.close()
-
 
 @app.route('/')
 def home():
@@ -94,7 +106,6 @@ def favicon():
 
 @app.route('/test-static')
 def test_static():
-    # لاگ کردن مسیر دایرکتوری static و فایل styles.css
     logger.debug(f"Static folder path: {app.static_folder}")
     styles_path = os.path.join(app.static_folder, 'styles.css')
     logger.debug(f"Looking for styles.css at: {styles_path}")
@@ -107,7 +118,7 @@ def test_static():
 @app.route('/run_script', methods=['POST'])
 def run_script():
     script_id = request.form.get('script_id')
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    base_dir = Path(__file__).resolve().parent.parent  # استفاده از pathlib برای run_script
     script_map = {
         '01': os.path.join(base_dir, 'src/blockchain/code01_blockchain_initial_data.py'),
         '02': os.path.join(base_dir, 'src/blockchain/code02_blockchain_congestion_improved.py'),
@@ -118,6 +129,7 @@ def run_script():
         '07': os.path.join(base_dir, 'src/traffic/code07_model_training.py'),
         '08': os.path.join(base_dir, 'src/traffic/code08_advanced_traffic_report.py'),
         '09': os.path.join(base_dir, 'src/smart/code09_smart_traffic_management.py'),
+        '12': os.path.join(base_dir, 'src/smart/code12_predictive_analysis_and_anomaly_detection.py'),
         'self_healing': os.path.join(base_dir, 'src/smart/self_healing_network.py'),
         'init': os.path.join(base_dir, 'src/init__.py')
     }
@@ -152,7 +164,7 @@ def run_script():
                     if stop_reading_flags.get(script_id, False):
                         break
                     line = process.stdout.readline()
-                    if not line and process.poll() is not None:
+                    if not line and process.poll() is None:
                         break
                     if line:
                         if "Debugger is active" in line or "Debugger PIN" in line:
@@ -163,7 +175,7 @@ def run_script():
                     if stop_reading_flags.get(script_id, False):
                         break
                     line = process.stderr.readline()
-                    if not line and process.poll() is not None:
+                    if not line and process.poll() is None:
                         break
                     if line:
                         if "Debugger is active" in line or "Debugger PIN" in line:
@@ -173,7 +185,7 @@ def run_script():
                 if not stop_reading_flags.get(script_id, False):
                     socketio.emit('script_output', {'script_id': script_id, 'output': 'Script executed successfully.'}, namespace='/')
                     report_link = None
-                    if script_id in ['01', '02', '03', '04']:
+                    if script_id in ['01', '02', '03', '04', '12']:
                         report_link = f"/report/{script_id}"
                     socketio.emit('report_link', {'script_id': script_id, 'report_link': report_link}, namespace='/')
                     socketio.emit('script_status', {'status': 'stopped', 'script_id': script_id}, namespace='/')
@@ -290,8 +302,7 @@ def force_stop_script():
         return jsonify({'error': str(e)})
 
 def fetch_data_from_db(db_name, table_name, node_id='', traffic_type='', time_range='', network_health=''):
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    db_path = os.path.join(base_dir, 'result', db_name)
+    db_path = base_dir / 'result' / db_name  # استفاده از pathlib برای مسیر دیتابیس
     try:
         query = f"SELECT * FROM {table_name}"
         conditions = []
@@ -348,6 +359,7 @@ def report(report_type):
         '02': ('congestion_data.db', 'congestion_blocks'),
         '03': ('managed_traffic.db', 'managed_blocks'),
         '04': ('new_orders.db', 'new_orders'),
+        '12': ('predictive_analysis.db', 'predictive_analysis'),
         'initial_data': ('traffic_data.db', 'blocks'),
         'congestion': ('congestion_data.db', 'congestion_blocks'),
         'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
@@ -373,8 +385,6 @@ def report(report_type):
 
 @app.route('/traffic_data')
 def traffic_data():
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-    db_path = os.path.join(base_dir, 'result', 'real_time_orders.db')
     try:
         node_id = request.args.get('node_id', '')
         traffic_type = request.args.get('traffic_type', '')
@@ -410,7 +420,7 @@ def traffic_data():
 
         query += " ORDER BY timestamp DESC LIMIT 10"
 
-        conn = sqlite3.connect(db_path)
+        conn = sqlite3.connect(real_time_db)
         c = conn.cursor()
         c.execute(query, params)
         rows = c.fetchall()
@@ -451,6 +461,209 @@ def traffic_data():
     except sqlite3.Error as e:
         logger.error("Database error: %s", str(e))
         return jsonify({'error': str(e)})
+
+@app.route('/predictions')
+def predictions():
+    try:
+        node_id = request.args.get('node_id', '')
+        time_range = request.args.get('time_range', '')
+
+        query = "SELECT timestamp, node_id, traffic_volume, congestion_level, predicted_congestion FROM predictive_analysis"
+        conditions = []
+        params = []
+
+        if node_id:
+            conditions.append("node_id = ?")
+            params.append(node_id)
+
+        if time_range:
+            now = datetime.now()
+            if time_range == '1m':
+                time_threshold = now - timedelta(minutes=1)
+            elif time_range == '5m':
+                time_threshold = now - timedelta(minutes=5)
+            else:
+                time_threshold = None
+
+            if time_threshold:
+                conditions.append("timestamp >= ?")
+                params.append(time_threshold.strftime('%Y-%m-%d %H:%M:%S'))
+
+        if conditions:
+            query += " WHERE " + " AND ".join(conditions)
+
+        query += " ORDER BY timestamp DESC LIMIT 10"
+
+        conn = sqlite3.connect(predictive_db)
+        c = conn.cursor()
+        c.execute(query, params)
+        rows = c.fetchall()
+        conn.close()
+
+        logger.debug("Fetched predictions from DB: %s", rows)
+
+        timestamps = [row[0] for row in rows]
+        node_ids = [row[1] for row in rows]
+        traffic_volumes = [float(row[2]) for row in rows]
+        congestion_mapping = {"Low": 0, "Medium": 1, "High": 2}
+        actual_congestion = [congestion_mapping.get(row[3], 0) for row in rows]
+        predicted_congestion = [congestion_mapping.get(row[4], 0) for row in rows]
+
+        return jsonify({
+            'timestamps': timestamps,
+            'node_ids': node_ids,
+            'traffic_volumes': traffic_volumes,
+            'actual_congestion': actual_congestion,
+            'predicted_congestion': predicted_congestion
+        })
+    except sqlite3.Error as e:
+        logger.error("Database error in predictions: %s", str(e))
+        return jsonify({'error': str(e)})
+
+@app.route('/traffic_report_data')
+def traffic_report_data():
+    try:
+        query = "SELECT timestamp, node_id, daily_average_traffic, daily_max_traffic, daily_min_traffic, health_trend FROM traffic_report ORDER BY timestamp DESC LIMIT 50"
+        conn = sqlite3.connect(traffic_report_db)
+        c = conn.cursor()
+        c.execute(query)
+        rows = c.fetchall()
+        conn.close()
+
+        timestamps = [row[0] for row in rows]
+        node_ids = [row[1] for row in rows]
+        daily_avg_traffic = [float(row[2]) for row in rows]
+        daily_max_traffic = [float(row[3]) for row in rows]
+        daily_min_traffic = [float(row[4]) for row in rows]
+        health_trend = [row[5] for row in rows]
+
+        return jsonify({
+            'timestamps': timestamps,
+            'node_ids': node_ids,
+            'daily_avg_traffic': daily_avg_traffic,
+            'daily_max_traffic': daily_max_traffic,
+            'daily_min_traffic': daily_min_traffic,
+            'health_trend': health_trend
+        })
+    except sqlite3.Error as e:
+        logger.error("Database error in traffic_report_data: %s", str(e))
+        return jsonify({'error': str(e)})
+
+@app.route('/export/pdf/<report_type>')
+def export_pdf(report_type):
+    report_map = {
+        '01': ('traffic_data.db', 'blocks'),
+        '02': ('congestion_data.db', 'congestion_blocks'),
+        '03': ('managed_traffic.db', 'managed_blocks'),
+        '04': ('new_orders.db', 'new_orders'),
+        '12': ('predictive_analysis.db', 'predictive_analysis'),
+        'initial_data': ('traffic_data.db', 'blocks'),
+        'congestion': ('congestion_data.db', 'congestion_blocks'),
+        'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
+        'new_orders': ('new_orders.db', 'new_orders'),
+        'real_time_orders': ('real_time_orders.db', 'real_time_orders'),
+        'self_healing': ('self_healing.db', 'healing_network'),
+        'smart_traffic': ('smart_traffic.db', 'smart_traffic'),
+        'traffic_report': ('traffic_report.db', 'traffic_report')
+    }
+
+    db_name, table_name = report_map.get(report_type, (None, None))
+    if not db_name or not table_name:
+        return jsonify({'error': 'Invalid report type'}), 404
+
+    node_id = request.args.get('node_id', '')
+    traffic_type = request.args.get('traffic_type', '')
+    time_range = request.args.get('time_range', '')
+    network_health = request.args.get('network_health', '')
+
+    rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
+
+    # Create PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+
+    styles = getSampleStyleSheet()
+    elements.append(Paragraph(f"Traffic Report - {report_type}", styles['Title']))
+    elements.append(Paragraph("Generated on: " + datetime.now().strftime('%Y-%m-%d %H:%M:%S'), styles['Normal']))
+    elements.append(Paragraph(" ", styles['Normal']))
+
+    # Prepare table data
+    table_data = [columns]  # Header row
+    for row in rows:
+        table_data.append([str(item) for item in row])
+
+    # Create table
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('TEXTCOLOR', (0, 1), (-1, -1), colors.black),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    elements.append(table)
+
+    doc.build(elements)
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"traffic_report_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+        mimetype='application/pdf'
+    )
+
+@app.route('/export/excel/<report_type>')
+def export_excel(report_type):
+    report_map = {
+        '01': ('traffic_data.db', 'blocks'),
+        '02': ('congestion_data.db', 'congestion_blocks'),
+        '03': ('managed_traffic.db', 'managed_blocks'),
+        '04': ('new_orders.db', 'new_orders'),
+        '12': ('predictive_analysis.db', 'predictive_analysis'),
+        'initial_data': ('traffic_data.db', 'blocks'),
+        'congestion': ('congestion_data.db', 'congestion_blocks'),
+        'managed_traffic': ('managed_traffic.db', 'managed_blocks'),
+        'new_orders': ('new_orders.db', 'new_orders'),
+        'real_time_orders': ('real_time_orders.db', 'real_time_orders'),
+        'self_healing': ('self_healing.db', 'healing_network'),
+        'smart_traffic': ('smart_traffic.db', 'smart_traffic'),
+        'traffic_report': ('traffic_report.db', 'traffic_report')
+    }
+
+    db_name, table_name = report_map.get(report_type, (None, None))
+    if not db_name or not table_name:
+        return jsonify({'error': 'Invalid report type'}), 404
+
+    node_id = request.args.get('node_id', '')
+    traffic_type = request.args.get('traffic_type', '')
+    time_range = request.args.get('time_range', '')
+    network_health = request.args.get('network_health', '')
+
+    rows, columns = fetch_data_from_db(db_name, table_name, node_id, traffic_type, time_range, network_health)
+
+    # Create DataFrame
+    df = pd.DataFrame(rows, columns=columns)
+
+    # Create Excel file
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Traffic Report')
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"traffic_report_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 @app.route('/add_new_order', methods=['POST'])
 def add_new_order():

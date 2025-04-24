@@ -12,36 +12,45 @@ import random
 from tqdm import tqdm
 import sys
 
-
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
 # تنظیمات اولیه
 np.random.seed(42)
 num_nodes = 10
-time_steps = 400
+time_steps = 40  # برای حدود 400 بلاک
 start_time = datetime(2025, 2, 27, 7, 0, 0)
 congestion_prob = 0.15
 
+# تعریف کلاس نود
+class Node:
+    def __init__(self, node_id, capacity):
+        self.node_id = node_id
+        self.capacity = capacity  # ظرفیت نود (مثلاً پهنای باند یا توان پردازش)
+        self.history = 0  # تعداد بلاک‌های موفق اعتبارسنجی‌شده
+
+    def update_history(self):
+        """افزایش تاریخچه بعد از اعتبارسنجی موفق"""
+        self.history += 1
+
 # گراف نودها
-nodes = [f"Node_{i}" for i in range(1, num_nodes + 1)]
+nodes = [Node(f"Node_{i}", random.uniform(100, 1000)) for i in range(1, num_nodes + 1)]
 graph = {}
 for node in nodes:
-    neighbors = random.sample(nodes, random.randint(1, 3))  # 1 تا 3 همسایه تصادفی
-    weights = [random.uniform(1, 5) for _ in neighbors]  # وزن تصادفی (تأخیر)
-    graph[node] = {"neighbors": neighbors, "weights": weights}
+    neighbors = random.sample([n.node_id for n in nodes], random.randint(1, 3))
+    weights = [random.uniform(1, 5) for _ in neighbors]
+    graph[node.node_id] = {"neighbors": neighbors, "weights": weights}
 
 # تولید کلیدهای ECDSA
-node_keys = {node: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
-node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
+node_keys = {node.node_id: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
+node_public_keys = {node_id: key.public_key() for node_id, key in node_keys.items()}
 
 # دیتابیس SQLite
 current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))  # به دایرکتوری start/ بروید
+start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
 db_file = os.path.join(start_dir, "result", "traffic_data.db")
 
 def init_db():
-    # اطمینان از وجود پوشه result
     result_dir = os.path.dirname(db_file)
     if not os.path.exists(result_dir):
         os.makedirs(result_dir)
@@ -64,12 +73,12 @@ def save_to_db(block):
     conn.commit()
     conn.close()
 
-# کلاس بلاک با انواع ترافیک
+# کلاس بلاک
 class Block:
     def __init__(self, timestamp, node_id, traffic_type, traffic_volume, network_health, latency, previous_hash, nonce=0):
-        self.timestamp = timestamp  # datetime
+        self.timestamp = timestamp
         self.node_id = node_id
-        self.traffic_type = traffic_type  # نوع ترافیک اضافه شده
+        self.traffic_type = traffic_type
         self.traffic_volume = traffic_volume
         self.network_health = network_health
         self.latency = latency
@@ -103,11 +112,12 @@ class Block:
             print(f"Signing failed for {self.node_id}: {e}")
             return False
 
-# کلاس بلاک‌چین با کش
+# کلاس بلاک‌چین
 class Blockchain:
     def __init__(self):
         self.chain = []
-        self.cache = {"latest_hash": "0"}  # کش برای previous_hash
+        self.cache = {"latest_hash": "0"}
+        self.nodes = nodes  # اضافه کردن لیست نودها به بلاکچین
         self.create_genesis_block()
 
     def create_genesis_block(self):
@@ -122,8 +132,16 @@ class Blockchain:
         return self.chain[-1]
 
     def proof_of_stake(self, node_id):
-        hash_value = int(hashlib.sha256(f"{node_id}{self.cache['latest_hash']}{time.time()}".encode()).hexdigest(), 16)
-        return hash_value % 1 == 0
+        """انتخاب اعتبارسنج با وزن‌دهی بر اساس ظرفیت و تاریخچه"""
+        weights = [node.capacity + node.history * 10 for node in self.nodes]  # وزن = ظرفیت + 10 * تاریخچه
+        total_weight = sum(weights)
+        if total_weight == 0:
+            return False
+        selected_node = random.choices(self.nodes, weights=weights, k=1)[0]
+        if selected_node.node_id == node_id:
+            selected_node.update_history()  # به‌روزرسانی تاریخچه نود انتخاب‌شده
+            return True
+        return False
 
     def add_block(self, block, node_id):
         start_time = time.time()
@@ -131,7 +149,7 @@ class Blockchain:
         while not self.proof_of_stake(node_id):
             nonce += 1
             block.nonce = nonce
-            block.hash = block.calculate_hash()
+            block.hash = block.calculate_hash()  # اصلاح: استفاده از متد calculate_hash بلاک
             if time.time() - start_time > 5:
                 print(f"Timeout for block at {block.timestamp} for {node_id}")
                 return False
@@ -139,11 +157,11 @@ class Blockchain:
             if block.previous_hash == self.cache["latest_hash"]:
                 self.chain.append(block)
                 save_to_db(block)
-                self.cache["latest_hash"] = block.hash  # به‌روزرسانی کش
+                self.cache["latest_hash"] = block.hash
                 return True
         return False
 
-# توابع تقسیم‌شده برای شبیه‌سازی و تولید بلاک
+# توابع شبیه‌سازی و تولید بلاک
 def simulate_traffic(node_id, timestamp):
     hour = timestamp.hour + timestamp.minute / 60
     peak_prob = 0.3 if 8 <= hour < 18 else 0.05
@@ -167,23 +185,20 @@ def create_block(traffic_data, previous_hash, node_id):
     )
 
 # تولید داده‌ها
-init_db()  # مقداردهی اولیه دیتابیس
+init_db()
 blockchain = Blockchain()
 
-# ایجاد لیست از تمام زمان‌ها و نودها به صورت تصادفی
-tasks = [(t, node) for t in range(time_steps) for node in nodes]
+tasks = [(t, node.node_id) for t in range(time_steps) for node in nodes]
 random.shuffle(tasks)
 
-# اضافه کردن نوار پیشرفت به حلقه
 total_tasks = len(tasks)
-for idx, (t, node) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
+for idx, (t, node_id) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
     timestamp = start_time + timedelta(seconds=t * 5)
-    traffic_data = simulate_traffic(node, timestamp)
+    traffic_data = simulate_traffic(node_id, timestamp)
     previous_hash = blockchain.cache["latest_hash"]
-    block = create_block(traffic_data, previous_hash, node)
-    if blockchain.add_block(block, node):
-        # چاپ پیشرفت به صورت خط جدید
-        tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node}, Traffic: {traffic_data['volume']:.2f} MB/s")
+    block = create_block(traffic_data, previous_hash, node_id)
+    if blockchain.add_block(block, node_id):
+        tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node_id}, Traffic: {traffic_data['volume']:.2f} MB/s")
 
 # نمایش خلاصه
 conn = sqlite3.connect(db_file)

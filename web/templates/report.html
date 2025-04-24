@@ -3,79 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Network Traffic Report - {{ report_type }}</title>
+    <title>Traffic Report - {{ report_type }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
 </head>
-<body class="report-page font-arial bg-gray-100 m-0 p-5 flex flex-col items-center min-h-screen w-full overflow-x-hidden">
-    <h1 class="mt-4 text-center text-dark-blue animate-slideInDown">Network Traffic Report - {{ report_type }}</h1>
-    <div class="text-center mb-4 w-full max-w-4xl mx-auto">
-        <a href="/" class="px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 bg-teal text-white hover:bg-blue-hover"><i class="fas fa-home"></i> Back to Dashboard</a>
-    </div>
-    <!-- بخش فیلتر کردن گزارش -->
-    <div class="filter-section mb-4 flex flex-wrap gap-4 items-center bg-white p-4 rounded-lg shadow-light animate-fadeIn border border-gray-border w-full max-w-4xl mx-auto">
-        <label for="report-node-filter" class="font-semibold text-sm text-dark-blue mr-2">Node ID:</label>
-        <select id="report-node-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-            <option value="">All Nodes</option>
-            <option value="Node_1">Node 1</option>
-            <option value="Node_2">Node 2</option>
-            <option value="Node_3">Node 3</option>
-            <option value="Node_4">Node 4</option>
-            <option value="Node_5">Node 5</option>
-            <option value="Node_6">Node 6</option>
-            <option value="Node_7">Node 7</option>
-            <option value="Node_8">Node 8</option>
-            <option value="Node_9">Node 9</option>
-            <option value="Node_10">Node 10</option>
-        </select>
+<body class="font-poppins bg-gradient-to-br from-light-bg to-light-gray text-text-dark">
+    <div class="container mx-auto p-5">
+        <header class="bg-dark-blue text-white p-4 px-5 sticky top-0 z-[1000] flex justify-between items-center shadow-[0_2px_10px_rgba(0,0,0,0.2)] h-[60px]">
+            <h1 class="text-2xl m-0">Traffic Report - {{ report_type }}</h1>
+            <button onclick="toggleTheme()" class="theme-toggle bg-transparent border-none text-white text-xl cursor-pointer transition-transform duration-300 hover:scale-110"><i class="fas fa-moon"></i></button>
+        </header>
 
-        <label for="report-type-filter" class="font-semibold text-sm text-dark-blue mr-2">Traffic Type:</label>
-        <select id="report-type-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-            <option value="">All Types</option>
-            <option value="Data">Data</option>
-            <option value="Stream">Stream</option>
-            <option value="Game">Game</option>
-        </select>
+        <!-- Filter Section -->
+        <div class="filter-section flex flex-wrap gap-4 mb-5 mt-5 items-center bg-white p-4 rounded-lg shadow-light animate-fadeIn border border-gray-border w-full max-w-4xl mx-auto">
+            <label for="report-node-filter" class="font-semibold text-sm text-dark-blue mr-2">Node ID:</label>
+            <select id="report-node-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
+                <option value="">All Nodes</option>
+                <option value="Node_1">Node 1</option>
+                <option value="Node_2">Node 2</option>
+                <option value="Node_3">Node 3</option>
+                <option value="Node_4">Node 4</option>
+                <option value="Node_5">Node 5</option>
+                <option value="Node_6">Node 6</option>
+                <option value="Node_7">Node 7</option>
+                <option value="Node_8">Node 8</option>
+                <option value="Node_9">Node 9</option>
+                <option value="Node_10">Node 10</option>
+            </select>
 
-        <label for="report-time-filter" class="font-semibold text-sm text-dark-blue mr-2">Time Range:</label>
-        <select id="report-time-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-            <option value="">All Time</option>
-            <option value="1h">Last 1 Hour</option>
-            <option value="24h">Last 24 Hours</option>
-            <option value="7d">Last 7 Days</option>
-        </select>
+            <label for="report-type-filter" class="font-semibold text-sm text-dark-blue mr-2">Traffic Type:</label>
+            <select id="report-type-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
+                <option value="">All Types</option>
+                <option value="Data">Data</option>
+                <option value="Stream">Stream</option>
+                <option value="Game">Game</option>
+            </select>
 
-        <label for="report-health-filter" class="font-semibold text-sm text-dark-blue mr-2">Network Health:</label>
-        <select id="report-health-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-            <option value="">All Statuses</option>
-            <option value="Normal">Normal</option>
-            <option value="Delayed">Delayed</option>
-            <option value="Down">Down</option>
-        </select>
+            <label for="report-time-filter" class="font-semibold text-sm text-dark-blue mr-2">Time Range:</label>
+            <select id="report-time-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
+                <option value="">All Time</option>
+                <option value="1h">Last 1 Hour</option>
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+            </select>
 
-        <button onclick="fetchReportData()" class="px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 bg-teal text-white hover:bg-blue-hover">Apply Filters</button>
-    </div>
-    <!-- جدول گزارش -->
-    <div class="table-container mt-4 overflow-x-auto whitespace-nowrap relative max-h-[600px] w-full max-w-4xl mx-auto animate-slideInUp flex justify-center">
-        <table class="w-full border-collapse table-auto" id="report-table">
-            <thead class="bg-dark-blue text-white sticky top-0 z-10">
-                <tr>
-                    {% for column in columns %}
-                        <th class="p-2 border border-gray-border text-center align-middle text-sm max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{{ column }}</th>
+            <label for="report-health-filter" class="font-semibold text-sm text-dark-blue mr-2">Network Health:</label>
+            <select id="report-health-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
+                <option value="">All</option>
+                <option value="good">Good</option>
+                <option value="moderate">Moderate</option>
+                <option value="poor">Poor</option>
+            </select>
+        </div>
+
+        <!-- Interactive Charts (only for traffic_report) -->
+        {% if report_type == 'traffic_report' %}
+        <div class="charts-section grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+            <div class="chart-card bg-white rounded-lg shadow-medium p-4">
+                <h3 class="text-lg font-semibold mb-3">Daily Traffic Trends</h3>
+                <div id="trafficTrendChart" style="height: 300px;"></div>
+            </div>
+            <div class="chart-card bg-white rounded-lg shadow-medium p-4">
+                <h3 class="text-lg font-semibold mb-3">Network Health Trend</h3>
+                <div id="healthTrendChart" style="height: 300px;"></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Export Buttons -->
+        <div class="export-buttons flex gap-3 mb-5 justify-center">
+            <a href="/export/pdf/{{ report_type }}?node_id={{ request.args.get('node_id', '') }}&traffic_type={{ request.args.get('traffic_type', '') }}&time_range={{ request.args.get('time_range', '') }}&network_health={{ request.args.get('network_health', '') }}" class="bg-teal text-white px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 hover:bg-blue-hover">Export to PDF</a>
+            <a href="/export/excel/{{ report_type }}?node_id={{ request.args.get('node_id', '') }}&traffic_type={{ request.args.get('traffic_type', '') }}&time_range={{ request.args.get('time_range', '') }}&network_health={{ request.args.get('network_health', '') }}" class="bg-teal text-white px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 hover:bg-blue-hover">Export to Excel</a>
+        </div>
+
+        <!-- Report Table -->
+        <div class="overflow-x-auto bg-white rounded-lg shadow-medium p-4">
+            <table class="min-w-full border-collapse">
+                <thead>
+                    <tr class="bg-dark-blue text-white">
+                        {% for column in columns %}
+                        <th class="border p-2 text-left">{{ column }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody id="report-table-body">
+                    {% for row in rows %}
+                    <tr class="hover:bg-gray-100">
+                        {% for item in row %}
+                        <td class="border p-2">{{ item }}</td>
+                        {% endfor %}
+                    </tr>
                     {% endfor %}
-                </tr>
-            </thead>
-            <tbody id="report-table-body">
-                {% for row in rows %}
-                <tr class="hover:bg-gray-200 transition-colors duration-300">
-                    {% for cell in row %}
-                        <td class="p-2 border border-gray-border bg-gray-light text-center align-middle text-sm max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{{ cell }}</td>
-                    {% endfor %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.plotly.com/plotly-latest.min.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        // Update report data when filters change
+        $('#report-node-filter, #report-type-filter, #report-time-filter, #report-health-filter').on('change', function() {
+            fetchReportData();
+        });
+    </script>
+</body>
 </html>

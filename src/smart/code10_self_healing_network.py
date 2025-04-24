@@ -7,10 +7,10 @@ import sqlite3
 import json
 import logging
 import sys
-import pandas as pd
 from tqdm import tqdm
-import joblib
-
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.backends import default_backend
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
@@ -18,13 +18,11 @@ sys.stdout.reconfigure(line_buffering=True)
 # تنظیمات لاج‌گیری
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# مسیر دیتابیس و مدل
+# مسیر دیتابیس
 current_dir = os.path.dirname(os.path.abspath(__file__))
 start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
-input_db = os.path.join(start_dir, "result", "real_time_orders.db")  # ورودی از code05
-output_db = os.path.join(start_dir, "result", "smart_traffic.db")
-model_file = os.path.join(start_dir, "result", "congestion_model.pkl")
-encoders_file = os.path.join(start_dir, "result", "encoders.pkl")
+input_db = os.path.join(start_dir, "result", "smart_traffic.db")  # ورودی از code09
+output_db = os.path.join(start_dir, "result", "self_healing.db")
 
 # گراف نودها
 nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
@@ -35,23 +33,9 @@ graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)),
 # وضعیت نودها
 node_status = {node: {"max_capacity": 100, "current_traffic": 0, "active": True} for node in nodes}
 
-# آستانه‌های پویا
-thresholds = {"medium": 40, "high": 70}
-
-# بارگذاری مدل و انکودرها
-try:
-    model = joblib.load(model_file)
-    encoders = joblib.load(encoders_file)
-    le_health = encoders["health"]
-    le_type = encoders["type"]
-    le_level = encoders["level"]
-    logging.info(f"Loaded model from {model_file} and encoders from {encoders_file}")
-except Exception as e:
-    logging.error(f"Failed to load model or encoders: {e}")
-    sys.exit(1)
-
-# کش برای کاهش کوئری‌های دیتابیس
-db_cache = {}
+# تولید کلیدهای ECDSA
+node_keys = {node: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
+node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
 
 # دیتابیس SQLite
 def init_db():
@@ -61,37 +45,29 @@ def init_db():
     
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS smart_traffic
+    c.execute('''CREATE TABLE IF NOT EXISTS healing_network
                  (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
                   latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, 
-                  traffic_redistribution TEXT, event_type TEXT, predicted_congestion TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS optimization_log
-                 (timestamp TEXT, medium_threshold REAL, high_threshold REAL, high_blocks INTEGER)''')
+                  traffic_redistribution TEXT, event_type TEXT, healing_action TEXT, predicted_congestion TEXT,
+                  signature TEXT)''')
     conn.commit()
     conn.close()
 
 def save_to_db(block):
     conn = sqlite3.connect(output_db)
     c = conn.cursor()
-    c.execute("INSERT INTO smart_traffic VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    c.execute("INSERT INTO healing_network VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
               (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
                block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_level, block.traffic_redistribution, block.event_type, block.predicted_congestion))
-    conn.commit()
-    conn.close()
-
-def save_optimization_log(timestamp, medium_threshold, high_threshold, high_blocks):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO optimization_log VALUES (?, ?, ?, ?)",
-              (timestamp, medium_threshold, high_threshold, high_blocks))
+               block.congestion_level, block.traffic_redistribution, block.event_type, block.healing_action,
+               block.predicted_congestion, block.signature.hex() if block.signature else None))
     conn.commit()
     conn.close()
 
 # کلاس بلاک
-class SmartTrafficBlock:
+class HealingBlock:
     def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_level, 
-                 traffic_redistribution=None, event_type="Normal", predicted_congestion=None):
+                 traffic_redistribution=None, event_type="Normal", healing_action="None", predicted_congestion=None, signature=None):
         self.timestamp = timestamp
         self.node_id = node_id
         self.traffic_layer = traffic_layer
@@ -100,7 +76,9 @@ class SmartTrafficBlock:
         self.congestion_level = congestion_level
         self.traffic_redistribution = traffic_redistribution or "None"
         self.event_type = event_type
+        self.healing_action = healing_action
         self.predicted_congestion = predicted_congestion
+        self.signature = signature
         self.hash = self.calculate_hash()
 
     def calculate_hash(self):
@@ -108,27 +86,30 @@ class SmartTrafficBlock:
             "timestamp": self.timestamp, "node_id": self.node_id, "traffic_layer": self.traffic_layer,
             "health_layer": self.health_layer, "previous_hash": self.previous_hash,
             "congestion_level": self.congestion_level, "traffic_redistribution": self.traffic_redistribution,
-            "event_type": self.event_type, "predicted_congestion": self.predicted_congestion
+            "event_type": self.event_type, "healing_action": self.healing_action,
+            "predicted_congestion": self.predicted_congestion
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-# پیش‌بینی با مدل ML
-def predict_congestion(block):
-    try:
-        data = pd.DataFrame([{
-            "traffic_volume": block.traffic_layer["volume"],
-            "latency": block.health_layer["latency"],
-            "network_health": block.health_layer["status"],
-            "traffic_type": block.traffic_layer["type"]
-        }])
-        data["network_health"] = le_health.transform(data["network_health"])
-        data["traffic_type"] = le_type.transform(data["traffic_type"])
-        prediction = model.predict(data)[0]
-        predicted_level = le_level.inverse_transform([prediction])[0]
-        return predicted_level
-    except Exception as e:
-        logging.error(f"Prediction failed for block {block.node_id}: {e}")
-        return block.congestion_level
+    def sign_block(self, private_key):
+        try:
+            message = self.hash.encode()
+            self.signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signing failed for {self.node_id}: {e}")
+            return False
+
+    def verify_signature(self, public_key):
+        try:
+            if not self.signature:
+                logging.error(f"No signature found for block {self.node_id}")
+                return False
+            public_key.verify(self.signature, self.hash.encode(), ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signature verification failed for {self.node_id}: {e}")
+            return False
 
 # پخش ترافیک هوشمند
 def redistribute_traffic(node_id, excess_traffic):
@@ -147,36 +128,75 @@ def redistribute_traffic(node_id, excess_traffic):
     
     return ", ".join(redistribution)
 
+# محاسبه احتمال فعال‌سازی مجدد نود
+def calculate_reactivation_probability(node_id, chain):
+    # داده‌های تاریخی: تعداد بلاک‌های موفق اخیر (سلامت "Up")
+    node_blocks = [b for b in chain if b.node_id == node_id][-10:]  # 10 بلاک آخر
+    if not node_blocks:
+        return 0.1  # پیش‌فرض
+    
+    up_blocks = sum(1 for b in node_blocks if b.health_layer["status"] == "Up")
+    up_ratio = up_blocks / len(node_blocks)
+    
+    # سلامت همسایه‌ها
+    neighbors = graph[node_id]["neighbors"]
+    healthy_neighbors = sum(1 for n in neighbors if any(b.health_layer["status"] == "Up" for b in chain if b.node_id == n))
+    neighbor_health_ratio = healthy_neighbors / len(neighbors) if neighbors else 0
+    
+    # احتمال فعال‌سازی: ترکیبی از سلامت نود و همسایه‌ها
+    probability = 0.1 + (up_ratio * 0.4) + (neighbor_health_ratio * 0.3)  # حداکثر 80%
+    return min(probability, 0.8)
+
+# مکانیزم خود-ترمیمی
+def self_heal(block, chain):
+    health = block.health_layer["status"]
+    congestion = block.predicted_congestion  # استفاده از پیش‌بینی مدل ML
+    node_id = block.node_id
+    neighbors = graph[node_id]["neighbors"]
+    
+    # پیدا کردن نودهای همسایه سالم
+    healthy_neighbors = []
+    for neighbor in neighbors:
+        neighbor_blocks = [b for b in chain if b.node_id == neighbor]
+        if neighbor_blocks and neighbor_blocks[-1].health_layer["status"] == "Up":
+            healthy_neighbors.append(neighbor)
+    
+    # فعال‌سازی مجدد نود غیرفعال
+    healing_action = "None"
+    if not node_status[node_id]["active"]:
+        reactivation_prob = calculate_reactivation_probability(node_id, chain)
+        if random.random() < reactivation_prob:
+            node_status[node_id]["active"] = True
+            block.health_layer["status"] = "Up"
+            block.health_layer["latency"] = random.uniform(0, 5)
+            healing_action = f"Node reactivated with probability {reactivation_prob:.2f}"
+    
+    # خود-ترمیمی بر اساس وضعیت
+    if congestion in ["High", "Medium"] and healthy_neighbors:
+        return f"Reroute traffic to healthy neighbor {random.choice(healthy_neighbors)} due to predicted {congestion} congestion", healing_action
+    elif health == "Down" and healthy_neighbors:
+        return f"Reroute traffic to healthy neighbor {random.choice(healthy_neighbors)} due to node failure", healing_action
+    elif congestion == "High":
+        return "Reduce traffic load by 40% to prevent congestion", healing_action
+    return "None", healing_action
+
 # کلاس بلاک‌چین
 class TrafficBlockchain:
     def __init__(self):
         self.chain = []
         self.cache = {}
-        self.block_history = []
         self.load_from_db()
 
     def load_from_db(self):
-        global db_cache
-        if input_db in db_cache:
-            rows = db_cache[input_db]
-            logging.info(f"Loaded {len(rows)} blocks from cache for {input_db}")
-        else:
-            conn = sqlite3.connect(input_db)
-            c = conn.cursor()
-            c.execute("SELECT * FROM real_time_orders")
-            rows = c.fetchall()
-            conn.close()
-            db_cache[input_db] = rows
-            logging.info(f"Loaded {len(rows)} blocks from {input_db} and cached")
-
+        conn = sqlite3.connect(input_db)
+        c = conn.cursor()
+        c.execute("SELECT * FROM smart_traffic")
+        rows = c.fetchall()
         for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
             traffic_layer = {"volume": row[3], "type": row[2]}
             health_layer = {"status": row[4], "latency": row[5]}
-            congestion_level = row[8]
-            traffic_suggestion = row[11]
-            event_type = "Normal"
-            block = SmartTrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_level, 
-                                     traffic_suggestion, event_type)
+            block = HealingBlock(row[0], row[1], traffic_layer, health_layer, row[6], row[8], 
+                                row[9], row[10], "None", row[11])
             block.hash = row[7]
             self.chain.append(block)
             if row[1] not in self.cache:
@@ -185,12 +205,13 @@ class TrafficBlockchain:
             if len(self.cache[row[1]]) > 4:
                 self.cache[row[1]].pop(0)
             tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
-        print(f"Processed {len(rows)} blocks")
+        conn.close()
+        print(f"Loaded {len(rows)} blocks from {input_db}")
 
     def add_block(self, block):
         traffic_volume = block.traffic_layer["volume"]
         node_id = block.node_id
-        predicted_congestion = predict_congestion(block)  # پیش‌بینی با مدل ML
+        predicted_congestion = block.predicted_congestion
         
         if node_status[node_id]["active"]:
             node_status[node_id]["current_traffic"] = traffic_volume
@@ -211,11 +232,15 @@ class TrafficBlockchain:
                     redistribution = redistribute_traffic(node_id, excess_traffic)
                     node_status[node_id]["current_traffic"] = max_capacity
 
-        new_block = SmartTrafficBlock(block.timestamp, node_id, block.traffic_layer, block.health_layer,
-                                     block.previous_hash, block.congestion_level, redistribution, 
-                                     block.event_type, predicted_congestion)
+        reroute_action, healing_action = self_heal(block, self.chain)
+        new_block = HealingBlock(block.timestamp, node_id, block.traffic_layer, block.health_layer,
+                                block.previous_hash, block.congestion_level, redistribution, 
+                                block.event_type, healing_action, predicted_congestion)
+        new_block.sign_block(node_keys[node_id])
+        if not new_block.verify_signature(node_public_keys[node_id]):
+            logging.error(f"Invalid signature for block {new_block.node_id}, block discarded")
+            return False
         self.chain.append(new_block)
-        self.block_history.append(new_block)
         if node_id not in self.cache:
             self.cache[node_id] = []
         self.cache[node_id].append(new_block)
@@ -224,39 +249,18 @@ class TrafficBlockchain:
         save_to_db(new_block)
         return new_block
 
-    def optimize_thresholds(self):
-        global thresholds
-        if len(self.block_history) < 100:
-            return
-
-        threshold_pairs = [(30, 60), (40, 70), (50, 80)]
-        best_high_count = float('inf')
-        best_pair = (thresholds["medium"], thresholds["high"])
-
-        for medium, high in threshold_pairs:
-            high_count = sum(1 for block in self.block_history[-100:] if block.traffic_layer["volume"] > high)
-            if high_count < best_high_count:
-                best_high_count = high_count
-                best_pair = (medium, high)
-
-        thresholds["medium"], thresholds["high"] = best_pair
-        timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
-        save_optimization_log(timestamp, thresholds["medium"], thresholds["high"], best_high_count)
-        print(f"Thresholds updated: Medium={thresholds['medium']}, High={thresholds['high']}, High Blocks={best_high_count}")
-
     def generate_report(self):
         total_blocks = len(self.chain)
         high_congestion = sum(1 for block in self.chain if block.congestion_level == "High")
-        accurate_predictions = sum(1 for block in self.chain if block.congestion_level == block.predicted_congestion)
-        accuracy = (accurate_predictions / total_blocks * 100) if total_blocks > 0 else 0
+        self_heal_actions = sum(1 for block in self.chain if block.healing_action != "None")
 
-        print("\nSmart Traffic Management Report:")
+        print("\nSelf-Healing Network Report:")
         print(f"Total Blocks Processed: {total_blocks}")
         print(f"High Congestion Blocks: {high_congestion}")
-        print(f"Prediction Accuracy: {accuracy:.2f}% ({accurate_predictions}/{total_blocks} correct)")
+        print(f"Total Self-Heal Actions Taken: {self_heal_actions}")
 
-# مانیتورینگ هوشمند
-def smart_monitoring():
+# مانیتورینگ خود-ترمیم
+def healing_monitoring():
     init_db()
     traffic_blockchain = TrafficBlockchain()
     last_time = time.time()
@@ -266,21 +270,16 @@ def smart_monitoring():
         node_status[node]["active"] = True
 
     total_blocks = len(traffic_blockchain.chain[1:])
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Smart Traffic Blocks", file=sys.stdout)):
+    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Self-Heal Blocks", file=sys.stdout)):
         traffic_blockchain.add_block(block)
         print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
         print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
               f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
               f"Predicted Congestion: {block.predicted_congestion}, Redistribution: {block.traffic_redistribution}, "
-              f"Event: {block.event_type}")
-        
-        if len(traffic_blockchain.block_history) >= 100:
-            traffic_blockchain.optimize_thresholds()
-            traffic_blockchain.block_history = traffic_blockchain.block_history[-100:]
-        
+              f"Event: {block.event_type}, Healing: {block.healing_action}")
         last_time = time.time()
 
     traffic_blockchain.generate_report()
 
 if __name__ == "__main__":
-    smart_monitoring()
+    healing_monitoring()

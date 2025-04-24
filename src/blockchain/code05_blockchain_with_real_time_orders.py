@@ -1,84 +1,78 @@
-import os
-import random
 import hashlib
-from datetime import datetime
+import os
 import logging
 import sqlite3
 import json
+import random
 import time
-import threading
+from tqdm import tqdm
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.backends import default_backend
 import sys
-
 
 # غیرفعال کردن بافرینگ خروجی
 sys.stdout.reconfigure(line_buffering=True)
 
-# Setup logging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s', handlers=[logging.StreamHandler()])
+# تنظیمات لاج‌گیری
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database paths
+# مسیر دیتابیس
 current_dir = os.path.dirname(os.path.abspath(__file__))
-start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))  # Go to start/ directory
-input_db = os.path.join(start_dir, "result", "managed_traffic.db")
+start_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
+input_db = os.path.join(start_dir, "result", "new_orders.db")
 output_db = os.path.join(start_dir, "result", "real_time_orders.db")
 
-# Graph of nodes
-nodes = [f"Node_{i}" for i in range(1, 11)]  # You can reduce the number for testing (e.g., 3)
+# گراف نودها
+nodes = [f"Node_{i}" for i in range(1, 11)] + ["Genesis"]
 graph = {node: {"neighbors": random.sample(nodes, random.randint(1, 3)), 
                 "weights": [random.uniform(1, 5) for _ in range(random.randint(1, 3))]} 
          for node in nodes}
 
-# Initialize output database
+# تولید کلیدهای ECDSA
+node_keys = {node: ec.generate_private_key(ec.SECP256R1(), default_backend()) for node in nodes}
+node_public_keys = {node: key.public_key() for node, key in node_keys.items()}
+
+# دیتابیس خروجی
 def init_db():
-    try:
-        # Ensure the result directory exists
-        result_dir = os.path.dirname(output_db)
-        if not os.path.exists(result_dir):
-            os.makedirs(result_dir)
-            logging.info(f"Created result directory: {result_dir}")
-        
-        conn = sqlite3.connect(output_db, timeout=10)  # Add timeout to prevent locking
-        c = conn.cursor()
-        c.execute('''CREATE TABLE IF NOT EXISTS real_time_orders
-                     (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
-                      latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, congestion_score REAL,
-                      latency_impact REAL, traffic_suggestion TEXT, is_real_time_order INTEGER)''')
-        conn.commit()
-        conn.close()
-        logging.info(f"Initialized database: {output_db}")
-    except sqlite3.Error as e:
-        logging.error(f"Database initialization error: {e}")
-        raise
+    result_dir = os.path.dirname(output_db)
+    if not os.path.exists(result_dir):
+        os.makedirs(result_dir)
+    
+    conn = sqlite3.connect(output_db)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS real_time_orders
+                 (timestamp TEXT, node_id TEXT, traffic_type TEXT, traffic_volume REAL, network_health TEXT,
+                  latency REAL, previous_hash TEXT, block_hash TEXT, congestion_level TEXT, congestion_score REAL,
+                  latency_impact REAL, traffic_suggestion TEXT, order_type TEXT, signature TEXT)''')
+    conn.commit()
+    conn.close()
+    print(f"Output database initialized at {output_db}")
 
 def save_to_db(block):
-    try:
-        conn = sqlite3.connect(output_db, timeout=10)  # Add timeout
-        c = conn.cursor()
-        c.execute("INSERT INTO real_time_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                  (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
-                   block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-                   block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
-                   block.traffic_suggestion, 1 if block.is_real_time_order else 0))
-        conn.commit()
-        conn.close()
-        logging.info(f"Saved real-time block for {block.node_id} at {block.timestamp}")
-    except sqlite3.Error as e:
-        logging.error(f"Database save error for block {block.node_id}: {e}")
-        raise
+    conn = sqlite3.connect(output_db)
+    c = conn.cursor()
+    c.execute("INSERT INTO real_time_orders VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+              (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
+               block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
+               block.congestion_layer["level"], block.congestion_layer["score"], block.congestion_layer["impact"],
+               block.traffic_suggestion, block.order_type, block.signature.hex() if block.signature else None))
+    conn.commit()
+    conn.close()
 
-# Block class
-class RealTimeBlock:
-    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer=None, 
-                 traffic_suggestion=None, is_real_time_order=False):
+# کلاس بلاک
+class TrafficBlock:
+    def __init__(self, timestamp, node_id, traffic_layer, health_layer, previous_hash, congestion_layer, traffic_suggestion=None, order_type=None, signature=None):
         self.timestamp = timestamp
         self.node_id = node_id
         self.traffic_layer = traffic_layer
         self.health_layer = health_layer
         self.previous_hash = previous_hash
-        self.congestion_layer = congestion_layer or {"is_congested": 0, "score": 0.0, "impact": 0.0, "level": "Low"}
+        self.congestion_layer = congestion_layer
         self.traffic_suggestion = traffic_suggestion
-        self.is_real_time_order = is_real_time_order
+        self.order_type = order_type
         self.hash = self.calculate_hash()
+        self.signature = signature
 
     def calculate_hash(self):
         block_string = json.dumps({
@@ -89,110 +83,134 @@ class RealTimeBlock:
             "previous_hash": self.previous_hash,
             "congestion_layer": self.congestion_layer,
             "traffic_suggestion": self.traffic_suggestion,
-            "is_real_time_order": self.is_real_time_order
+            "order_type": self.order_type
         }, sort_keys=True).encode()
         return hashlib.sha256(block_string).hexdigest()
 
-# Real-time blockchain class
-class RealTimeBlockchain:
+    def sign_block(self, private_key):
+        try:
+            message = self.hash.encode()
+            self.signature = private_key.sign(message, ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signing failed for {self.node_id}: {e}")
+            return False
+
+    def verify_signature(self, public_key):
+        try:
+            if not self.signature:
+                logging.error(f"No signature found for block {self.node_id}")
+                return False
+            public_key.verify(self.signature, self.hash.encode(), ec.ECDSA(hashes.SHA256()))
+            return True
+        except Exception as e:
+            logging.error(f"Signature verification failed for {self.node_id}: {e}")
+            return False
+
+    def suggest_traffic_management(self):
+        if self.congestion_layer["is_congested"] == 1:
+            traffic_type = self.traffic_layer["type"]
+            volume = self.traffic_layer["volume"]
+            health = self.health_layer["status"]
+            neighbors = graph[self.node_id]["neighbors"]
+
+            if self.order_type == "Priority":
+                return f"Fast-track {traffic_type} traffic, allocate maximum resources to {self.node_id}"
+            elif volume > 70:
+                return f"Redirect {traffic_type} traffic to {random.choice(neighbors)} or limit bandwidth by 50%"
+            elif health == "Down":
+                return f"Increase monitoring for {traffic_type}, reroute to {random.choice(neighbors)}"
+            elif health == "Delayed":
+                return f"Optimize {traffic_type} routing, reduce load by 30%"
+            else:
+                return f"Reduce {traffic_type} traffic by 20% or prioritize critical nodes"
+        return None
+
+# کلاس بلاک‌چین
+class TrafficBlockchain:
     def __init__(self):
         self.chain = []
         self.cache = {}
         self.load_from_db()
-        self.running = True  # Flag to control the simulation loop
 
     def load_from_db(self):
-        try:
-            conn = sqlite3.connect(input_db, timeout=10)
-            c = conn.cursor()
-            c.execute("SELECT * FROM managed_blocks")
-            rows = c.fetchall()
-            for row in rows:
-                traffic_layer = {"type": row[2], "volume": row[3]}
-                health_layer = {"status": row[4], "latency": row[5]}
-                congestion_layer = {"is_congested": 1 if row[8] in ["Medium", "High"] else 0, 
-                                   "score": row[9], "impact": row[10], "level": row[8]}
-                block = RealTimeBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, row[11], True)
-                block.hash = row[7]
-                self.chain.append(block)
-                if row[1] not in self.cache:
-                    self.cache[row[1]] = []
-                self.cache[row[1]].append(block)
-                if len(self.cache[row[1]]) > 5:  # Keep the last 5 blocks
-                    self.cache[row[1]].pop(0)
-            conn.close()
-            logging.info(f"Loaded {len(rows)} blocks from managed_traffic.db")
-        except sqlite3.Error as e:
-            logging.error(f"Database load error: {e}")
-            raise
+        conn = sqlite3.connect(input_db)
+        c = conn.cursor()
+        c.execute("SELECT * FROM new_orders")
+        rows = c.fetchall()
+        # مرتب‌سازی برای اولویت دادن به بلاک‌های Priority
+        priority_blocks = [row for row in rows if row[12] == "Priority"]
+        standard_blocks = [row for row in rows if row[12] != "Priority"]
+        sorted_rows = priority_blocks + standard_blocks
+        for row in tqdm(sorted_rows, desc="Loading blocks from DB", file=sys.stdout):
+            traffic_layer = {"volume": row[3], "type": row[2]}
+            health_layer = {"status": row[4], "latency": row[5]}
+            congestion_layer = {"is_congested": 1 if row[8] in ["Medium", "High"] else 0, 
+                               "score": row[9], "impact": row[10], "level": row[8]}
+            traffic_suggestion = row[11]
+            order_type = row[12]
+            signature = bytes.fromhex(row[13]) if len(row) > 13 and row[13] else None
+            block = TrafficBlock(row[0], row[1], traffic_layer, health_layer, row[6], congestion_layer, 
+                                traffic_suggestion, order_type, signature)
+            block.hash = row[7]
+            if not block.signature:  # برای بلاک‌های قدیمی بدون امضا
+                block.sign_block(node_keys[row[1]])
+            self.chain.append(block)
+            if row[1] not in self.cache:
+                self.cache[row[1]] = []
+            self.cache[row[1]].append(block)
+            if len(self.cache[row[1]]) > 4:
+                self.cache[row[1]].pop(0)
+            tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
+        conn.close()
+        print(f"Loaded {len(rows)} blocks from {input_db}")
 
     def add_real_time_block(self, block):
-        try:
-            self.chain.append(block)
-            if block.node_id not in self.cache:
-                self.cache[block.node_id] = []
-            self.cache[block.node_id].append(block)
-            if len(self.cache[block.node_id]) > 5:
-                self.cache[block.node_id].pop(0)
-            save_to_db(block)
-            # Print to stdout for app.py to capture
-            print(f"Real-time block added: Node {block.node_id}, Traffic: {block.traffic_layer['volume']} MB/s, "
-                  f"Congestion: {block.congestion_layer['level']}, Time: {block.timestamp}")
-        except Exception as e:
-            logging.error(f"Error adding real-time block for {block.node_id}: {e}")
-            raise
+        suggestion = block.suggest_traffic_management()
+        order_type = block.order_type
+        new_block = TrafficBlock(block.timestamp, block.node_id, block.traffic_layer, block.health_layer,
+                                 block.previous_hash, block.congestion_layer, suggestion, order_type)
+        new_block.sign_block(node_keys[block.node_id])  # امضای بلاک جدید
+        if not new_block.verify_signature(node_public_keys[block.node_id]):
+            logging.error(f"Invalid signature for block {new_block.node_id}, block discarded")
+            return False
+        self.chain.append(new_block)
+        if block.node_id not in self.cache:
+            self.cache[block.node_id] = []
+        self.cache[block.node_id].append(new_block)
+        if len(self.cache[block.node_id]) > 4:
+            self.cache[block.node_id].pop(0)
+        save_to_db(new_block)
+        # شبیه‌سازی تأخیر بلادرنگ
+        delay = 0.05 if order_type == "Priority" else 0.1
+        time.sleep(delay)
+        return True
 
-    def stop(self):
-        self.running = False  # Stop the simulation loop
+    def generate_report(self):
+        priority_orders = 0
+        total_congested = 0
+        real_time_blocks = 0
 
-# Generate simulated traffic
-def generate_simulated_traffic(node_id):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    traffic_layer = {
-        "type": random.choice(["video", "audio", "data"]),
-        "volume": random.uniform(10, 100)  # Traffic volume between 10 and 100 MB
-    }
-    health_layer = {
-        "status": random.choice(["good", "moderate", "poor"]),
-        "latency": random.uniform(10, 100)  # Latency between 10 and 100 ms
-    }
-    previous_hash = "0"  # For initial blocks
-    return RealTimeBlock(timestamp, node_id, traffic_layer, health_layer, previous_hash)
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM real_time_orders WHERE order_type = 'Priority'")
+        priority_orders = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM real_time_orders WHERE congestion_level IN ('Medium', 'High')")
+        total_congested = c.fetchone()[0]
+        c.execute("SELECT COUNT(*) FROM real_time_orders")
+        real_time_blocks = c.fetchone()[0]
+        conn.close()
 
-# Simulate real-time
-def simulate_real_time(blockchain):
-    try:
-        while blockchain.running:  # Run until stopped
-            previous_block = blockchain.chain[-1] if blockchain.chain else None
-            for node in nodes:
-                if not blockchain.running:  # Check if we should stop
-                    break
-                block = generate_simulated_traffic(node)
-                blockchain.add_real_time_block(block)
-                print(f"Simulated real-time block for {node} at {block.timestamp} with traffic: {block.traffic_layer['volume']} MB/s")
-                time.sleep(2)  # 2-second delay to reduce system load
-            previous_block = blockchain.chain[-1]  # Update previous block
-    except Exception as e:
-        logging.error(f"Error in simulate_real_time: {e}")
+        print("\nReal-Time Orders Report:")
+        print(f"Total Real-Time Blocks Processed: {real_time_blocks}")
+        print(f"Total Priority Orders: {priority_orders}")
+        print(f"Total Congested Points: {total_congested}")
 
-# Main execution
-if __name__ == "__main__":
-    try:
-        init_db()
-        real_time_blockchain = RealTimeBlockchain()
-        simulation_thread = threading.Thread(target=simulate_real_time, args=(real_time_blockchain,), daemon=True)
-        simulation_thread.start()
-        logging.info("Simulation thread started")
-        
-        # Keep the script running until interrupted
-        while True:
-            time.sleep(1)  # Keep the main thread alive
-    except KeyboardInterrupt:
-        logging.info("Simulation stopped by user")
-        real_time_blockchain.stop()
-        simulation_thread.join(timeout=5)  # Wait for the thread to finish
-    except Exception as e:
-        logging.error(f"Critical error in main execution: {e}")
-        real_time_blockchain.stop()
-        if simulation_thread.is_alive():
-            simulation_thread.join(timeout=5)
+# اجرا
+init_db()
+traffic_blockchain = TrafficBlockchain()
+total_blocks = len(traffic_blockchain.chain[1:])
+for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Real-Time Orders", file=sys.stdout)):
+    traffic_blockchain.add_real_time_block(block)
+    tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}, Delay: {0.05 if block.order_type == 'Priority' else 0.1}s")
+traffic_blockchain.generate_report()

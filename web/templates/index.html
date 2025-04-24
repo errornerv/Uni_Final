@@ -32,6 +32,7 @@
                         <li><a href="#" onclick="runScript('07')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Model Training</a></li>
                         <li><a href="#" onclick="runScript('08')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Advanced Traffic Report</a></li>
                         <li><a href="#" onclick="runScript('09')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Smart Traffic Management</a></li>
+                        <li><a href="#" onclick="runScript('12')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Predictive Analysis</a></li>
                         <li><a href="#" onclick="runScript('self_healing')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Self-Healing Network</a></li>
                         <li><a href="#" onclick="runScript('init')" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Initialize</a></li>
                     </ul>
@@ -43,6 +44,7 @@
                         <li><a href="/report/managed_traffic" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Managed Traffic</a></li>
                         <li><a href="/report/new_orders" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">New Orders</a></li>
                         <li><a href="/report/real_time_orders" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Real-Time Orders</a></li>
+                        <li><a href="/report/12" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Predictive Analysis</a></li>
                         <li><a href="/report/self_healing" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Self-Healing Network</a></li>
                         <li><a href="/report/smart_traffic" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Smart Traffic</a></li>
                         <li><a href="/report/traffic_report" class="w-full text-left bg-sidebar-menu border-none p-3 m-1 rounded text-text-light transition-colors duration-300 block text-base hover:bg-sidebar-hover">Traffic Report</a></li>
@@ -164,6 +166,10 @@
                 <h3>Traffic Type Distribution</h3>
                 <canvas id="typeChart" width="300" height="150"></canvas>
             </div>
+            <div class="chart-card bg-white rounded-lg shadow-medium p-4 transition-transform duration-200 hover:-translate-y-1">
+                <h3>Congestion Prediction</h3>
+                <canvas id="predictionChart" width="300" height="150"></canvas>
+            </div>
         </div>
         <div id="script-outputs"></div>
         <div class="floating-toolbar fixed bottom-5 left-1/2 -translate-x-1/2 flex justify-center gap-3 z-[1000]">
@@ -175,4 +181,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.1/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
 </html>
