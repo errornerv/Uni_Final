@@ -22,8 +22,15 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 socketio = SocketIO(app, async_mode='gevent', cors_allowed_origins="*")
 
-# تنظیمات لاگینگ
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# تنظیمات لاگینگ برای فایل و کنسول
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('result/init_report.log'),  # ذخیره لاگ‌ها در فایل
+        logging.StreamHandler(sys.stdout)  # نمایش لاگ‌ها در کنسول
+    ]
+)
 
 # مسیر ریشه پروژه
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -256,12 +263,20 @@ def get_reports():
         csv_path = RESULT_DIR / "traffic_data.csv"
         if csv_path.exists():
             df = pd.read_csv(csv_path)
-            # داده‌های دقیق (50 ردیف آخر)
-            df = df.tail(50)
-            rows = df[['node_id', 'traffic_type', 'traffic_volume', 'network_health', 'latency', 'timestamp']].values.tolist()
-            detailed_data['code06'] = rows
-            detailed_columns['code06'] = ['Node ID', 'Traffic Type', 'Traffic Volume', 'Network Health', 'Latency', 'Timestamp']
-            reports['code06'] = {'status': 'Data retrieved successfully'}
+            # بررسی وجود ستون‌ها
+            expected_columns = ['node_id', 'traffic_type', 'traffic_volume', 'network_health', 'latency', 'timestamp']
+            available_columns = [col for col in expected_columns if col in df.columns]
+            if not available_columns:
+                reports['code06'] = {'error': 'No expected columns found in traffic_data.csv'}
+                detailed_data['code06'] = []
+                detailed_columns['code06'] = ['Error']
+            else:
+                # فقط از ستون‌های موجود استفاده می‌کنیم
+                df = df[available_columns].tail(50)
+                rows = df.values.tolist()
+                detailed_data['code06'] = rows
+                detailed_columns['code06'] = available_columns
+                reports['code06'] = {'status': f'Data retrieved successfully (columns: {", ".join(available_columns)}) '}
         else:
             reports['code06'] = {'error': 'traffic_data.csv not found'}
     except Exception as e:
@@ -294,12 +309,21 @@ def get_reports():
             conn = sqlite3.connect(db_path)
             if table_exists(conn, 'traffic_report'):
                 c = conn.cursor()
-                # داده‌های دقیق
-                c.execute("SELECT report_type, node_id, value, details, timestamp FROM traffic_report ORDER BY timestamp DESC LIMIT 50")
+                # گرفتن لیست ستون‌ها
+                c.execute("PRAGMA table_info(traffic_report)")
+                columns = [info[1] for info in c.fetchall()]
+                # ستون‌های مورد نیاز
+                required_columns = ['report_type', 'node_id', 'value', 'details']
+                select_columns = [col for col in required_columns if col in columns]
+                # ستون برای مرتب‌سازی
+                order_column = 'timestamp' if 'timestamp' in columns else 'rowid'
+                # ساخت کوئری
+                query = f"SELECT {', '.join(select_columns)} FROM traffic_report ORDER BY {order_column} DESC LIMIT 50"
+                c.execute(query)
                 rows = c.fetchall()
                 detailed_data['code08'] = rows
-                detailed_columns['code08'] = ['Report Type', 'Node ID', 'Value', 'Details', 'Timestamp']
-                reports['code08'] = {'status': 'Data retrieved successfully'}
+                detailed_columns['code08'] = select_columns
+                reports['code08'] = {'status': f'Data retrieved successfully (columns: {", ".join(select_columns)}) '}
             else:
                 reports['code08'] = {'error': 'Table "traffic_report" not found in traffic_report.db'}
             conn.close()
@@ -382,11 +406,11 @@ def get_reports():
             conn = sqlite3.connect(db_path)
             if table_exists(conn, 'predictive_analysis'):
                 c = conn.cursor()
-                # داده‌های دقیق
-                c.execute("SELECT node_id, actual_congestion, predicted_congestion, anomaly_detected, timestamp FROM predictive_analysis ORDER BY timestamp DESC LIMIT 50")
+                # داده‌های دقیق - جایگزینی actual_congestion با congestion_level
+                c.execute("SELECT node_id, congestion_level, predicted_congestion, anomaly_detected, timestamp FROM predictive_analysis ORDER BY timestamp DESC LIMIT 50")
                 rows = c.fetchall()
                 detailed_data['code12'] = rows
-                detailed_columns['code12'] = ['Node ID', 'Actual Congestion', 'Predicted Congestion', 'Anomaly Detected', 'Timestamp']
+                detailed_columns['code12'] = ['Node ID', 'Congestion Level', 'Predicted Congestion', 'Anomaly Detected', 'Timestamp']
                 reports['code12'] = {'status': 'Data retrieved successfully'}
             else:
                 reports['code12'] = {'error': 'Table "predictive_analysis" not found in predictive_analysis.db'}
@@ -398,6 +422,20 @@ def get_reports():
         reports['code12'] = {'error': str(e)}
 
     return reports, detailed_data, detailed_columns
+
+# مسیر برای گرفتن گزارش init__.py
+@app.route('/init_report', methods=['GET'])
+def get_init_report():
+    try:
+        with open(RESULT_DIR / "init_report.log", 'r') as f:
+            content = f.read()
+        return jsonify({'status': 'success', 'content': content})
+    except FileNotFoundError:
+        logging.error("init_report.log not found")
+        return jsonify({'status': 'error', 'message': 'init_report.log not found'})
+    except Exception as e:
+        logging.error(f"Error reading init_report.log: {e}")
+        return jsonify({'status': 'error', 'message': str(e)})
 
 # مسیرهای Flask
 @app.route('/')
@@ -481,7 +519,7 @@ def predictions():
         
         c = conn.cursor()
         
-        c.execute("SELECT node_id, actual_congestion, predicted_congestion FROM predictive_analysis ORDER BY timestamp DESC LIMIT 50")
+        c.execute("SELECT node_id, congestion_level, predicted_congestion FROM predictive_analysis ORDER BY timestamp DESC LIMIT 50")
         rows = c.fetchall()
         
         node_ids = [row[0] for row in rows]

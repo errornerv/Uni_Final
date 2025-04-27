@@ -6,7 +6,7 @@
     <title>Traffic Management Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        #live-output {
+        #live-output, #init-report-output {
             max-height: 400px;
             overflow-y: auto;
             white-space: pre-wrap;
@@ -34,6 +34,9 @@
             </button>
             <button id="reset-scripts" class="bg-red-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-red-600 transition-transform transform hover:scale-105" onclick="resetScripts()">
                 Reset Scripts
+            </button>
+            <button id="view-init-report" class="bg-purple-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-purple-600 transition-transform transform hover:scale-105" onclick="toggleInitReport()">
+                View Init Report
             </button>
         </div>
 
@@ -78,6 +81,12 @@
             <!-- Live Output -->
             <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Live Output</h2>
             <div id="live-output" class="bg-gray-800 text-white p-4 rounded-lg"></div>
+
+            <!-- Init Report Output -->
+            <div id="init-report-section" class="mt-6 hidden">
+                <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Init Report (Live)</h2>
+                <div id="init-report-output" class="bg-gray-800 text-white p-4 rounded-lg"></div>
+            </div>
         </main>
     </div>
 
@@ -85,6 +94,7 @@
     <script>
         let socket = null;
         let isSocketConnected = false;
+        let isFetchingInitReport = false;
 
         function connectSocketIO() {
             if (!isSocketConnected) {
@@ -181,8 +191,49 @@
                 });
         }
 
+        let isInitReportVisible = false;
+        function toggleInitReport() {
+            const section = document.getElementById('init-report-section');
+            const button = document.getElementById('view-init-report');
+            isInitReportVisible = !isInitReportVisible;
+            if (isInitReportVisible) {
+                section.classList.remove('hidden');
+                button.textContent = 'Hide Init Report';
+                fetchInitReport(); // شروع به‌روزرسانی گزارش
+            } else {
+                section.classList.add('hidden');
+                button.textContent = 'View Init Report';
+            }
+        }
+
+        function fetchInitReport() {
+            if (!isInitReportVisible || isFetchingInitReport) return;
+            isFetchingInitReport = true;
+            fetch('/init_report')
+                .then(response => response.json())
+                .then(data => {
+                    const outputDiv = document.getElementById('init-report-output');
+                    if (data.status === 'success') {
+                        outputDiv.textContent = data.content;
+                    } else {
+                        outputDiv.textContent = 'Error: ' + data.message;
+                    }
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                })
+                .catch(error => {
+                    const outputDiv = document.getElementById('init-report-output');
+                    outputDiv.textContent = 'Error fetching init report: ' + error;
+                })
+                .finally(() => {
+                    isFetchingInitReport = false;
+                });
+        }
+
+        // به‌روزرسانی گزارش هر 5 ثانیه
+        setInterval(fetchInitReport, 5000);
+
         // Connect to Socket.IO only once on page load
         connectSocketIO();
     </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'936fa5b7aca2b0cf',t:'MTc0NTc3MDgyNy4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
