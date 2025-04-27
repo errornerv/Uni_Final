@@ -3,111 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Traffic Report - {{ report_type }}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Traffic Report - {{ code }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+    </style>
 </head>
-<body class="font-poppins bg-gradient-to-br from-light-bg to-light-gray text-text-dark">
-    <div class="container mx-auto p-5">
-        <header class="bg-dark-blue text-white p-4 px-5 sticky top-0 z-[1000] flex justify-between items-center shadow-[0_2px_10px_rgba(0,0,0,0.2)] h-[60px]">
-            <h1 class="text-2xl m-0">Traffic Report - {{ report_type }}</h1>
-            <button onclick="toggleTheme()" class="theme-toggle bg-transparent border-none text-white text-xl cursor-pointer transition-transform duration-300 hover:scale-110"><i class="fas fa-moon"></i></button>
-        </header>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="container mx-auto px-4 py-8 max-w-5xl">
+        <!-- عنوان -->
+        <h1 class="text-3xl font-bold text-gray-800 text-center mb-8 animate-bounce">Traffic Report - {{ code }}</h1>
 
-        <!-- Filter Section -->
-        <div class="filter-section flex flex-wrap gap-4 mb-5 mt-5 items-center bg-white p-4 rounded-lg shadow-light animate-fadeIn border border-gray-border w-full max-w-4xl mx-auto">
-            <label for="report-node-filter" class="font-semibold text-sm text-dark-blue mr-2">Node ID:</label>
-            <select id="report-node-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-                <option value="">All Nodes</option>
-                <option value="Node_1">Node 1</option>
-                <option value="Node_2">Node 2</option>
-                <option value="Node_3">Node 3</option>
-                <option value="Node_4">Node 4</option>
-                <option value="Node_5">Node 5</option>
-                <option value="Node_6">Node 6</option>
-                <option value="Node_7">Node 7</option>
-                <option value="Node_8">Node 8</option>
-                <option value="Node_9">Node 9</option>
-                <option value="Node_10">Node 10</option>
-            </select>
-
-            <label for="report-type-filter" class="font-semibold text-sm text-dark-blue mr-2">Traffic Type:</label>
-            <select id="report-type-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-                <option value="">All Types</option>
-                <option value="Data">Data</option>
-                <option value="Stream">Stream</option>
-                <option value="Game">Game</option>
-            </select>
-
-            <label for="report-time-filter" class="font-semibold text-sm text-dark-blue mr-2">Time Range:</label>
-            <select id="report-time-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-                <option value="">All Time</option>
-                <option value="1h">Last 1 Hour</option>
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-            </select>
-
-            <label for="report-health-filter" class="font-semibold text-sm text-dark-blue mr-2">Network Health:</label>
-            <select id="report-health-filter" class="p-2 px-3 rounded border border-gray-border text-sm bg-gray-50 transition-all duration-300 min-w-[120px] hover:border-teal focus:outline-none focus:border-teal focus:shadow-[0_0_8px_rgba(75,192,192,0.3)] focus:bg-white">
-                <option value="">All</option>
-                <option value="good">Good</option>
-                <option value="moderate">Moderate</option>
-                <option value="poor">Poor</option>
-            </select>
+        <!-- دکمه‌های اکسپورت -->
+        <div class="export-buttons flex justify-center gap-4 mb-8">
+            <a href="/export/pdf/{{ code }}" 
+               class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-blue-700 transition-transform transform hover:scale-105">
+                Export to PDF
+            </a>
+            <a href="/export/excel/{{ code }}" 
+               class="bg-green-600 text-white px-4 py-2 rounded-lg shadow-md hover:bg-green-700 transition-transform transform hover:scale-105">
+                Export to Excel
+            </a>
         </div>
 
-        <!-- Interactive Charts (only for traffic_report) -->
-        {% if report_type == 'traffic_report' %}
-        <div class="charts-section grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-            <div class="chart-card bg-white rounded-lg shadow-medium p-4">
-                <h3 class="text-lg font-semibold mb-3">Daily Traffic Trends</h3>
-                <div id="trafficTrendChart" style="height: 300px;"></div>
-            </div>
-            <div class="chart-card bg-white rounded-lg shadow-medium p-4">
-                <h3 class="text-lg font-semibold mb-3">Network Health Trend</h3>
-                <div id="healthTrendChart" style="height: 300px;"></div>
-            </div>
+        <!-- جدول گزارش -->
+        <div class="report-table bg-white rounded-lg shadow-lg p-6">
+            {% if 'error' in report %}
+                <p class="text-red-600 text-center">{{ report['error'] }}</p>
+            {% else %}
+                <!-- نمایش داده‌های دقیق -->
+                <h2 class="text-xl font-semibold text-gray-700 mb-4 text-center">Detailed Data</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-blue-600 text-white">
+                                {% for column in detailed_columns %}
+                                    <th class="p-3 text-left">{{ column }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in detailed_data %}
+                                <tr class="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                                    {% for cell in row %}
+                                        <td class="p-3 text-gray-700">{{ cell }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
         </div>
-        {% endif %}
 
-        <!-- Export Buttons -->
-        <div class="export-buttons flex gap-3 mb-5 justify-center">
-            <a href="/export/pdf/{{ report_type }}?node_id={{ request.args.get('node_id', '') }}&traffic_type={{ request.args.get('traffic_type', '') }}&time_range={{ request.args.get('time_range', '') }}&network_health={{ request.args.get('network_health', '') }}" class="bg-teal text-white px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 hover:bg-blue-hover">Export to PDF</a>
-            <a href="/export/excel/{{ report_type }}?node_id={{ request.args.get('node_id', '') }}&traffic_type={{ request.args.get('traffic_type', '') }}&time_range={{ request.args.get('time_range', '') }}&network_health={{ request.args.get('network_health', '') }}" class="bg-teal text-white px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 hover:bg-blue-hover">Export to Excel</a>
-        </div>
-
-        <!-- Report Table -->
-        <div class="overflow-x-auto bg-white rounded-lg shadow-medium p-4">
-            <table class="min-w-full border-collapse">
-                <thead>
-                    <tr class="bg-dark-blue text-white">
-                        {% for column in columns %}
-                        <th class="border p-2 text-left">{{ column }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody id="report-table-body">
-                    {% for row in rows %}
-                    <tr class="hover:bg-gray-100">
-                        {% for item in row %}
-                        <td class="border p-2">{{ item }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+        <!-- لینک بازگشت -->
+        <div class="back-link text-center mt-8">
+            <a href="/" class="text-blue-600 hover:text-blue-800 text-lg font-medium transition-colors duration-300">Back to Dashboard</a>
         </div>
     </div>
-
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://cdn.plotly.com/plotly-latest.min.js"></script>
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
-    <script>
-        // Update report data when filters change
-        $('#report-node-filter, #report-type-filter, #report-time-filter, #report-health-filter').on('change', function() {
-            fetchReportData();
-        });
-    </script>
 </body>
 </html>

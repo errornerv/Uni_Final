@@ -40,11 +40,14 @@ def init_db():
     print(f"Output database initialized at {output_db}")
 
 def save_report_to_db(report_type, node_id, value, details):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO traffic_report VALUES (?, ?, ?, ?)", (report_type, node_id, value, details))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("INSERT INTO traffic_report VALUES (?, ?, ?, ?)", (report_type, node_id, value, details))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving report to database: {e}")
 
 # کلاس تحلیل
 class AdvancedTrafficAnalyzer:
@@ -65,9 +68,17 @@ class AdvancedTrafficAnalyzer:
             total_rows = len(rows)
             for idx, row in enumerate(tqdm(rows, desc="Loading blocks from DB", file=sys.stdout)):
                 block = {
-                    "timestamp": row[0], "node_id": row[1], "traffic_type": row[2], "traffic_volume": row[3],
-                    "network_health": row[4], "latency": row[5], "previous_hash": row[6], "block_hash": row[7],
-                    "congestion_level": row[8], "congestion_score": row[9], "latency_impact": row[10],
+                    "timestamp": row[0], 
+                    "node_id": row[1], 
+                    "traffic_type": row[2], 
+                    "traffic_volume": row[3],
+                    "network_health": row[4], 
+                    "latency": row[5], 
+                    "previous_hash": row[6], 
+                    "block_hash": row[7],
+                    "congestion_level": row[8], 
+                    "congestion_score": row[9], 
+                    "latency_impact": row[10],
                     "traffic_suggestion": row[11]
                 }
                 self.chain.append(block)
@@ -81,7 +92,7 @@ class AdvancedTrafficAnalyzer:
             logging.info(f"Loaded {len(rows)} blocks from managed_traffic.db")
         except sqlite3.Error as e:
             logging.error(f"Database load error: {e}")
-            raise
+            self.chain = []
 
     def calculate_daily_traffic_average(self):
         if not self.chain:
@@ -89,7 +100,7 @@ class AdvancedTrafficAnalyzer:
             return {}
 
         traffic_by_node = defaultdict(list)
-        total_blocks = len(self.chain[1:])
+        total_blocks = len(self.chain[1:])  # بدون بلاک جنسیس
         for idx, block in enumerate(tqdm(self.chain[1:], desc="Calculating daily traffic averages", file=sys.stdout)):
             traffic_by_node[block["node_id"]].append(float(block["traffic_volume"]))
             tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks for daily average - Node: {block['node_id']}, Traffic: {block['traffic_volume']:.2f} MB/s")
@@ -142,11 +153,17 @@ class AdvancedTrafficAnalyzer:
     def generate_advanced_report(self):
         if not self.chain:
             logging.error("No data to process.")
-            return
+            return {}
 
         daily_averages = self.calculate_daily_traffic_average()
         health_impact = self.analyze_network_health_impact()
         high_traffic_nodes = self.identify_high_traffic_nodes()
+
+        report = {
+            "daily_averages": daily_averages,
+            "health_impact": health_impact,
+            "high_traffic_nodes_count": len(high_traffic_nodes)
+        }
 
         print("\nAdvanced Traffic Report:")
         print("Daily Average Traffic by Node (MB/s):")
@@ -158,14 +175,44 @@ class AdvancedTrafficAnalyzer:
             print(f"{health}: {stats['congestion_percentage']}% congested ({stats['total_blocks']} blocks)")
 
         print("\nHigh Traffic Nodes (Traffic > 50 MB/s):")
-        for node in high_traffic_nodes[:10]:
+        for node in high_traffic_nodes[:10]:  # محدود به 10 مورد برای نمایش
             print(node)
 
         logging.info(f"Advanced traffic report saved to: {output_db}")
+        return report
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    analyzer = AdvancedTrafficAnalyzer(limit)
-    analyzer.generate_advanced_report()
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        analyzer = AdvancedTrafficAnalyzer(limit)
+        report = analyzer.generate_advanced_report()
+        
+        block_count = len(analyzer.chain[1:])  # تعداد بلاک‌های پردازش‌شده (بدون جنسیس)
+        high_traffic_count = report.get("high_traffic_nodes_count", 0)
+        
+        summary = {
+            "total_blocks": block_count,
+            "high_traffic_nodes": high_traffic_count,
+            "output_db": output_db
+        }
+        
+        return {
+            "status": "success",
+            "block_count": block_count,
+            "summary": f"Processed {block_count} blocks, {high_traffic_count} high traffic nodes, report saved to {output_db}",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 8: Advanced traffic report: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to generate report",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

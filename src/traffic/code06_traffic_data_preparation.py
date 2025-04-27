@@ -62,7 +62,7 @@ def load_from_db(db_path, limit=None):
 def prepare_and_save_data(data, output_path):
     if not data:
         print("No data available to save.")
-        return
+        return 0
 
     try:
         result_dir = os.path.dirname(output_path)
@@ -75,13 +75,39 @@ def prepare_and_save_data(data, output_path):
         print(f"Data successfully saved to {output_path}.")
         print("First 5 rows of the data:")
         print(df.head())
+        return len(df)
     except Exception as e:
         print(f"Error saving data to {output_path}: {e}")
+        return 0
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    print("Starting data preparation process...")
-    chain_data = load_from_db(input_db, limit)
-    prepare_and_save_data(chain_data, output_file)
-    print("Data preparation process completed.")
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        print("Starting data preparation process...")
+        chain_data = load_from_db(input_db, limit)
+        row_count = prepare_and_save_data(chain_data, output_file)
+        
+        summary = {
+            "total_rows": row_count,
+            "output_file": output_file
+        }
+        
+        return {
+            "status": "success",
+            "block_count": row_count,  # تعداد ردیف‌های پردازش‌شده
+            "summary": f"Processed {row_count} rows, saved to {output_file}",
+            "details": summary
+        }
+    except Exception as e:
+        print(f"Error in Step 6: Data preparation: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to prepare data",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

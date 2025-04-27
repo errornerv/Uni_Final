@@ -1,5 +1,5 @@
 import sqlite3
-import joblib  # تغییر از pickle به joblib برای سازگاری
+import joblib
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -82,7 +82,6 @@ class TrafficBlockchain:
                     signature=signature
                 )
                 self.chain.append(block)
-
         except sqlite3.Error as e:
             logging.error(f"Error loading blockchain from DB: {e}")
             self.chain = []
@@ -117,9 +116,8 @@ class PredictiveAnalysis:
     def load_model_and_encoders(self):
         try:
             self.model = joblib.load(model_path)
-            self.label_encoders = joblib.load(encoders_path)  # تغییر به joblib برای سازگاری
+            self.label_encoders = joblib.load(encoders_path)
             logging.info(f"Loaded model from {model_path} and encoders from {encoders_path}")
-            # لاگ مقادیر classes_ برای بررسی
             for column in ['node_id', 'traffic_type', 'network_health']:
                 if column in self.label_encoders:
                     logging.info(f"Classes for {column}: {self.label_encoders[column].classes_}")
@@ -152,7 +150,6 @@ class PredictiveAnalysis:
             ])
         df = pd.DataFrame(data, columns=['node_id', 'traffic_type', 'traffic_volume', 'network_health', 'latency', 'congestion_score', 'congestion_impact'])
 
-        # پر کردن مقادیر NaN
         df.fillna({
             'traffic_volume': 0.0,
             'latency': 0.0,
@@ -160,29 +157,24 @@ class PredictiveAnalysis:
             'congestion_impact': 0.0
         }, inplace=True)
 
-        # لاگ مقادیر اولیه
         logging.info(f"Initial data types:\n{df.dtypes}")
         logging.info(f"Sample data before encoding:\n{df.head().to_string()}")
 
-        # بررسی تنوع داده‌ها
         if df['congestion_score'].nunique() == 1 and df['congestion_impact'].nunique() == 1:
             logging.warning("No variation in congestion_score and congestion_impact. Adding synthetic variation.")
             df['congestion_score'] = df['traffic_volume'] * 0.01 + np.random.uniform(-0.1, 0.1, len(df))
             df['congestion_impact'] = df['latency'] * 0.01 + np.random.uniform(-0.1, 0.1, len(df))
 
-        # تبدیل مقادیر متنی به عددی با مدیریت مقادیر ناشناخته
         for column in ['node_id', 'traffic_type', 'network_health']:
             if column in self.label_encoders:
                 encoder = self.label_encoders[column]
                 try:
-                    # بررسی مقادیر شناخته‌شده
                     known_values = set(encoder.classes_)
                     logging.info(f"Known values for {column}: {known_values}")
                     current_values = set(df[column].astype(str))
                     unknown_values = current_values - known_values
                     if unknown_values:
                         logging.warning(f"Unknown values in {column}: {unknown_values}. Replacing with first known value.")
-                        # انتخاب اولین مقدار شناخته‌شده به‌عنوان پیش‌فرض
                         default_value = list(known_values)[0] if known_values else "Unknown"
                         df[column] = df[column].astype(str).apply(
                             lambda x: x if x in known_values else default_value
@@ -190,7 +182,6 @@ class PredictiveAnalysis:
                     df[column] = encoder.transform(df[column].astype(str))
                 except Exception as e:
                     logging.error(f"Error encoding {column}: {e}")
-                    # در صورت خطا، از یه انکودر جدید استفاده کن
                     self.label_encoders[column] = LabelEncoder()
                     df[column] = self.label_encoders[column].fit_transform(df[column].astype(str))
             else:
@@ -198,7 +189,6 @@ class PredictiveAnalysis:
                 self.label_encoders[column] = LabelEncoder()
                 df[column] = self.label_encoders[column].fit_transform(df[column].astype(str))
 
-        # لاگ مقادیر بعد از انکودینگ
         logging.info(f"Data types after encoding:\n{df.dtypes}")
         logging.info(f"Sample data after encoding:\n{df.head().to_string()}")
 
@@ -280,36 +270,66 @@ def save_predictions_to_db(congestion_predictions, congestion_scores, anomalies,
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    traffic_blockchain = TrafficBlockchain(limit)
-    if not traffic_blockchain.chain:
-        logging.warning("No blocks found in the blockchain")
-        return
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        traffic_blockchain = TrafficBlockchain(limit)
+        if not traffic_blockchain.chain:
+            logging.warning("No blocks found in the blockchain")
+            return {
+                "status": "error",
+                "block_count": 0,
+                "summary": "No blocks found in the blockchain",
+                "error": "Empty blockchain"
+            }
 
-    analysis = PredictiveAnalysis()
-    end_time = datetime.now()
-    start_time = end_time - timedelta(hours=1)
-    recent_blocks = traffic_blockchain.get_blocks_in_time_range(
-        start_time.strftime('%Y-%m-%d %H:%M:%S'),
-        end_time.strftime('%Y-%m-%d %H:%M:%S')
-    )
+        analysis = PredictiveAnalysis()
+        end_time = datetime.now()
+        start_time = end_time - timedelta(hours=1)
+        recent_blocks = traffic_blockchain.get_blocks_in_time_range(
+            start_time.strftime('%Y-%m-%d %H:%M:%S'),
+            end_time.strftime('%Y-%m-%d %H:%M:%S')
+        )
 
-    if not recent_blocks:
-        logging.warning("No recent blocks found for analysis")
-        return
+        if not recent_blocks:
+            logging.warning("No recent blocks found for analysis")
+            return {
+                "status": "error",
+                "block_count": 0,
+                "summary": "No recent blocks found for analysis",
+                "error": "No recent blocks"
+            }
 
-    data = analysis.preprocess_data(recent_blocks)
-    congestion_predictions, congestion_scores = analysis.predict_congestion(data)
-    anomalies = analysis.detect_anomalies(data)
+        data = analysis.preprocess_data(recent_blocks)
+        congestion_predictions, congestion_scores = analysis.predict_congestion(data)
+        anomalies = analysis.detect_anomalies(data)
 
-    save_predictions_to_db(congestion_predictions, congestion_scores, anomalies, recent_blocks)
+        save_predictions_to_db(congestion_predictions, congestion_scores, anomalies, recent_blocks)
 
-    for block, pred, score, anomaly in zip(recent_blocks, congestion_predictions, congestion_scores, anomalies):
-        logging.info(f"Node: {block.node_id}, Timestamp: {block.timestamp}, Predicted Congestion: {pred}, Score: {score:.2f}, Anomaly: {'Yes' if anomaly == -1 else 'No'}")
+        anomaly_count = sum(1 for anomaly in anomalies if anomaly == -1)
+        report = {
+            "total_blocks": len(recent_blocks),
+            "anomaly_count": anomaly_count,
+            "high_congestion_predictions": sum(1 for pred in congestion_predictions if pred == "High")
+        }
+
+        for block, pred, score, anomaly in zip(recent_blocks, congestion_predictions, congestion_scores, anomalies):
+            logging.info(f"Node: {block.node_id}, Timestamp: {block.timestamp}, Predicted Congestion: {pred}, Score: {score:.2f}, Anomaly: {'Yes' if anomaly == -1 else 'No'}")
+
+        return {
+            "status": "success",
+            "block_count": len(recent_blocks),
+            "summary": f"Processed {len(recent_blocks)} blocks, detected {anomaly_count} anomalies",
+            "details": report
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 12: Predictive analysis and anomaly detection: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to perform predictive analysis",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logging.error(f"Error in Step 12: Predictive analysis and anomaly detection...: {e}")
-        raise
+    result = main()
+    print(result)

@@ -1,4 +1,3 @@
-
 import hashlib
 import json
 import os
@@ -182,28 +181,53 @@ def create_block(traffic_data, previous_hash, node_id):
 
 # تابع اصلی
 def main():
-    time_steps = 10 if os.getenv("DEMO_MODE") == "True" else 40
-    init_db()
-    blockchain = Blockchain()
-    tasks = [(t, node.node_id) for t in range(time_steps) for node in nodes]
-    random.shuffle(tasks)
-    total_tasks = len(tasks)
-    for idx, (t, node_id) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
-        timestamp = start_time + timedelta(seconds=t * 5)
-        traffic_data = simulate_traffic(node_id, timestamp)
-        previous_hash = blockchain.cache["latest_hash"]
-        block = create_block(traffic_data, previous_hash, node_id)
-        if blockchain.add_block(block, node_id):
-            tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node_id}, Traffic: {traffic_data['volume']:.2f} MB/s")
-    # گزارش خلاصه
-    conn = sqlite3.connect(db_file)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM blocks WHERE traffic_volume > 70")
-    congested = c.fetchone()[0]
-    c.execute("SELECT AVG(traffic_volume) FROM blocks")
-    avg_traffic = c.fetchone()[0]
-    conn.close()
-    print("\nData Summary:")
-    print(f"Total Blocks: {len(blockchain.chain)}")
-    print(f"Congested Points (>70 MB/s): {congested}")
-    print(f"Average Traffic: {avg_traffic:.2f} MB/s")
+    try:
+        time_steps = 10 if os.getenv("DEMO_MODE") == "True" else 40
+        init_db()
+        blockchain = Blockchain()
+        tasks = [(t, node.node_id) for t in range(time_steps) for node in nodes]
+        random.shuffle(tasks)
+        total_tasks = len(tasks)
+        processed_blocks = 0
+        for idx, (t, node_id) in enumerate(tqdm(tasks, desc="Processing blocks", file=sys.stdout)):
+            timestamp = start_time + timedelta(seconds=t * 5)
+            traffic_data = simulate_traffic(node_id, timestamp)
+            previous_hash = blockchain.cache["latest_hash"]
+            block = create_block(traffic_data, previous_hash, node_id)
+            if blockchain.add_block(block, node_id):
+                processed_blocks += 1
+                tqdm.write(f"Processed {idx + 1}/{total_tasks} blocks - Node: {node_id}, Traffic: {traffic_data['volume']:.2f} MB/s")
+        
+        # گزارش خلاصه
+        conn = sqlite3.connect(db_file)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM blocks WHERE traffic_volume > 70")
+        congested = c.fetchone()[0]
+        c.execute("SELECT AVG(traffic_volume) FROM blocks")
+        avg_traffic = c.fetchone()[0] or 0.0
+        conn.close()
+        
+        summary = {
+            "total_blocks": len(blockchain.chain),
+            "congested_points": congested,
+            "average_traffic": round(avg_traffic, 2)
+        }
+        
+        return {
+            "status": "success",
+            "block_count": processed_blocks,
+            "summary": f"Processed {processed_blocks} blocks, {congested} congested points, avg traffic: {avg_traffic:.2f} MB/s",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 1: Initial blockchain data: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

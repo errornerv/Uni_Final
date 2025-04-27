@@ -2,6 +2,8 @@ const socket = io();
 const scriptOutputs = {};
 let isScriptRunning = false;
 const LOG_LEVEL = 'ERROR'; // Options: 'DEBUG', 'INFO', 'ERROR'
+let isFetchingTraffic = false;
+let isFetchingPredictions = false;
 
 // Custom logging function
 function customLog(level, message) {
@@ -182,7 +184,8 @@ if (document.getElementById('predictionChart')) {
 
 // Fetch real-time data with filters
 function fetchTrafficData() {
-    if (!trafficChart && !healthChart && !latencyChart && !typeChart) return;
+    if (isFetchingTraffic || (!trafficChart && !healthChart && !latencyChart && !typeChart)) return;
+    isFetchingTraffic = true;
     
     const nodeFilter = $('#node-filter').val();
     const typeFilter = $('#type-filter').val();
@@ -227,12 +230,15 @@ function fetchTrafficData() {
         }
     }).fail(function(jqXHR, textStatus, errorThrown) {
         customLog('ERROR', 'Failed to fetch /traffic_data: ' + textStatus + ', ' + errorThrown);
+    }).always(function() {
+        isFetchingTraffic = false;
     });
 }
 
 // Fetch congestion predictions
 function fetchPredictions() {
-    if (!predictionChart) return;
+    if (isFetchingPredictions || !predictionChart) return;
+    isFetchingPredictions = true;
     
     const nodeFilter = $('#node-filter').val();
     const timeFilter = $('#time-filter').val();
@@ -248,12 +254,16 @@ function fetchPredictions() {
         customLog('INFO', 'Predictions fetched successfully');
 
         // Update Congestion Prediction Chart
-        predictionChart.data.labels = data.node_ids || [];
-        predictionChart.data.datasets[0].data = data.actual_congestion || [];
-        predictionChart.data.datasets[1].data = data.predicted_congestion || [];
-        predictionChart.update();
+        if (predictionChart) {
+            predictionChart.data.labels = data.node_ids || [];
+            predictionChart.data.datasets[0].data = data.actual_congestion || [];
+            predictionChart.data.datasets[1].data = data.predicted_congestion || [];
+            predictionChart.update();
+        }
     }).fail(function(jqXHR, textStatus, errorThrown) {
         customLog('ERROR', 'Failed to fetch /predictions: ' + textStatus + ', ' + errorThrown);
+    }).always(function() {
+        isFetchingPredictions = false;
     });
 }
 
@@ -368,6 +378,8 @@ function fetchTrafficReportData() {
     $.get('/traffic_report_data', function(data) {
         if (data.error) {
             customLog('ERROR', 'Error fetching traffic report data: ' + data.error);
+            Plotly.newPlot('trafficTrendChart', [], { title: 'Error: ' + data.error });
+            Plotly.newPlot('healthTrendChart', [], { title: 'Error: ' + data.error });
             return;
         }
         customLog('INFO', 'Traffic report data fetched successfully');
@@ -409,19 +421,22 @@ function fetchTrafficReportData() {
         // Plot Network Health Trend
         const healthTrace = {
             x: data.timestamps || [],
-            y: data.health_trend?.map(h => ({ 'good': 0, 'moderate': 1, 'poor': 2 }[h] || 0)) || [],
+            y: data.health_trend || [],
             mode: 'lines+markers',
-            name: 'Health Trend',
-            line: { color: '#FFCE56' }
+            name: 'Network Health',
+            line: { color: '#28a745' },
+            text: data.health_trend || [],
+            textposition: 'auto'
         };
 
         const healthLayout = {
             title: 'Network Health Trend',
             xaxis: { title: 'Timestamp' },
-            yaxis: {
+            yaxis: { 
                 title: 'Health Status',
-                tickvals: [0, 1, 2],
-                ticktext: ['Good', 'Moderate', 'Poor']
+                type: 'category',
+                categoryorder: 'array',
+                categoryarray: ['good', 'moderate', 'poor']
             },
             margin: { t: 50, b: 50, l: 50, r: 50 }
         };
@@ -429,163 +444,70 @@ function fetchTrafficReportData() {
         Plotly.newPlot('healthTrendChart', [healthTrace], healthLayout);
     }).fail(function(jqXHR, textStatus, errorThrown) {
         customLog('ERROR', 'Failed to fetch /traffic_report_data: ' + textStatus + ', ' + errorThrown);
+        Plotly.newPlot('trafficTrendChart', [], { title: 'Error loading data' });
+        Plotly.newPlot('healthTrendChart', [], { title: 'Error loading data' });
     });
 }
 
-// Initialize report page
-if (document.getElementById('report-node-filter')) {
-    $('#report-node-filter, #report-type-filter, #report-time-filter, #report-health-filter').on('change', function() {
-        fetchReportData();
-    });
-    fetchReportData();
-}
-
-if (document.getElementById('trafficTrendChart') && document.getElementById('healthTrendChart')) {
-    fetchTrafficReportData();
-    setInterval(fetchTrafficReportData, 5000);
-}
-
-// Show/Hide loading spinner
-function showLoading() {
-    if (isScriptRunning) {
-        $('#loading').show();
+// Theme toggle functionality
+function toggleTheme() {
+    const body = document.body;
+    const themeIcon = document.querySelector('.theme-toggle i');
+    body.classList.toggle('dark-mode');
+    if (body.classList.contains('dark-mode')) {
+        body.classList.remove('bg-gradient-to-br', 'from-light-bg', 'to-light-gray', 'text-text-dark');
+        body.classList.add('bg-gradient-to-br', 'from-dark-bg', 'to-dark-gray', 'text-text-light');
+        themeIcon.classList.remove('fa-moon');
+        themeIcon.classList.add('fa-sun');
+    } else {
+        body.classList.remove('bg-gradient-to-br', 'from-dark-bg', 'to-dark-gray', 'text-text-light');
+        body.classList.add('bg-gradient-to-br', 'from-light-bg', 'to-light-gray', 'text-text-dark');
+        themeIcon.classList.remove('fa-sun');
+        themeIcon.classList.add('fa-moon');
     }
+    customLog('INFO', 'Theme toggled');
+}
+
+// Loading animation functions
+function showLoading() {
+    const loadingOverlay = document.createElement('div');
+    loadingOverlay.id = 'loading-overlay';
+    loadingOverlay.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+        background: rgba(0, 0, 0, 0.5); display: flex; justify-content: center; 
+        align-items: center; z-index: 9999;
+    `;
+    loadingOverlay.innerHTML = `
+        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #4BC0C0; 
+        border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+    document.body.appendChild(loadingOverlay);
 }
 
 function hideLoading() {
-    $('#loading').hide();
-    isScriptRunning = false;
-}
-
-// Create script output panel
-function createScriptOutputPanel(scriptId) {
-    if (!scriptOutputs[scriptId]) {
-        const outputDiv = document.createElement('div');
-        outputDiv.className = 'script-panel bg-gray-light rounded-lg p-4 mb-4 max-h-[300px] overflow-y-auto shadow-small';
-        outputDiv.id = `panel-${scriptId}`;
-        outputDiv.innerHTML = `
-            <h4 onclick="toggleOutput('${scriptId}')" class="mb-3 cursor-pointer flex justify-between items-center">Script: ${scriptId} <i class="fas fa-chevron-down" id="toggle-output-${scriptId}"></i></h4>
-            <pre id="output-${scriptId}" class="script-output bg-white p-4 border rounded block"></pre>
-            <div id="link-${scriptId}" class="mt-2"></div>
-            <div class="script-toolbar mt-2 flex gap-3 sticky bottom-0 bg-gray-light pt-3">
-                <button onclick="stopScript('${scriptId}')" class="bg-red-error border-none px-3 py-1 rounded text-white transition-all duration-200 hover:bg-red-hover hover:scale-105"><i class="fas fa-stop"></i> Stop</button>
-                <button onclick="clearScriptOutput('${scriptId}')" class="bg-red-error border-none px-3 py-1 rounded text-white transition-all duration-200 hover:bg-red-hover hover:scale-105"><i class="fas fa-trash-alt"></i> Clear</button>
-            </div>
-        `;
-        document.getElementById('script-outputs')?.appendChild(outputDiv);
-        scriptOutputs[scriptId] = true;
+    const loadingOverlay = document.getElementById('loading-overlay');
+    if (loadingOverlay) {
+        loadingOverlay.remove();
     }
 }
 
-socket.on('output', function(data) {
-    hideLoading();
-    createScriptOutputPanel(data.script_id || 'unknown');
-    const output = $(`#output-${data.script_id || 'unknown'}`);
-    output.append(data + '\n');
-    const panel = $(`#panel-${data.script_id || 'unknown'}`);
-    panel.scrollTop(panel[0].scrollHeight);
+// Fetch traffic report data on page load if elements exist
+$(document).ready(function() {
+    fetchTrafficReportData();
 });
 
-socket.on('report_link', function(data) {
-    createScriptOutputPanel(data.script_id);
-    if (data.report_link) {
-        $(`#link-${data.script_id}`).html(`<a href="${data.report_link}" class="btn btn-info px-4 py-2 rounded font-medium cursor-pointer transition-colors duration-300 bg-blue-500 text-white hover:bg-blue-600">View Report</a>`);
-    } else {
-        $(`#link-${data.script_id}`).html('');
-    }
+// Update report data when filters change
+$('#report-node-filter, #report-type-filter, #report-time-filter, #report-health-filter').on('change', function() {
+    fetchReportData();
 });
 
-socket.on('script_status', function(data) {
-    createScriptOutputPanel(data.script_id);
-    const output = $(`#output-${data.script_id}`);
-    if (data.status === 'running') {
-        output.text('Script is running...\n');
-    } else if (data.status === 'stopped') {
-        hideLoading();
-        output.append('Script stopped.\n');
-        const panel = $(`#panel-${data.script_id}`);
-        panel.scrollTop(panel[0].scrollHeight);
-        $(`#link-${data.script_id}`).html('');
-    }
-});
-
-function runScript(scriptId) {
-    customLog('INFO', `Running script: ${scriptId}`);
-    isScriptRunning = true;
-    showLoading();
-    createScriptOutputPanel(scriptId);
-    $(`#output-${scriptId}`).text('');
-    $(`#link-${scriptId}`).html('');
-    $.post('/run_module/' + scriptId, function(data) {
-        if (data.error) {
-            hideLoading();
-            $(`#output-${scriptId}`).text('Error: ' + data.error);
-        }
-    }).fail(function(jqXHR, textStatus, errorThrown) {
-        customLog('ERROR', 'Failed to run script: ' + textStatus + ', ' + errorThrown);
-        hideLoading();
-    });
-}
-
-function stopScript(scriptId) {
-    $.post('/run_module/' + scriptId, { stop: true }, function(data) {
-        if (data.error) {
-            $(`#output-${scriptId}`).append('Error: ' + data.error + '\n');
-            customLog('ERROR', 'Error stopping script: ' + data.error);
-        }
-        hideLoading();
-    }).fail(function(jqXHR, textStatus, errorThrown) {
-        customLog('ERROR', 'Failed to stop script: ' + textStatus + ', ' + errorThrown);
-        hideLoading();
-    });
-}
-
-function clearTerminal() {
-    Object.keys(scriptOutputs).forEach(scriptId => {
-        $(`#output-${scriptId}`).text('');
-        $(`#link-${scriptId}`).html('');
-        $(`#panel-${scriptId}`).remove();
-        delete scriptOutputs[scriptId];
-    });
-}
-
-function clearScriptOutput(scriptId) {
-    $(`#output-${scriptId}`).text('');
-    $(`#link-${scriptId}`).html('');
-}
-
-function toggleSubMenu(id) {
-    const subMenu = $(`#${id}`);
-    const icon = $(`#${id}-icon`);
-    subMenu.slideToggle();
-    icon.toggleClass('fa-chevron-down fa-chevron-up');
-}
-
-function toggleOutput(scriptId) {
-    const output = $(`#output-${scriptId}`);
-    const icon = $(`#toggle-output-${scriptId}`);
-    output.slideToggle();
-    icon.toggleClass('fa-chevron-down fa-chevron-up');
-}
-
-function toggleSidebar() {
-    const sidebar = $('#sidebar');
-    const mainContent = $('#main-content');
-    sidebar.toggleClass('collapsed');
-    mainContent.toggleClass('full-width');
-    if (sidebar.hasClass('collapsed')) {
-        sidebar.addClass('-translate-x-full');
-        mainContent.removeClass('ml-[250px] w-[calc(100%-250px)]');
-        mainContent.addClass('ml-0 w-full');
-    } else {
-        sidebar.removeClass('-translate-x-full');
-        mainContent.removeClass('ml-0 w-full');
-        mainContent.addClass('ml-[250px] w-[calc(100%-250px)]');
-    }
-}
-
-function toggleTheme() {
-    $('body').toggleClass('dark-theme');
-    const icon = $('.theme-toggle i');
-    icon.toggleClass('fa-moon fa-sun');
+// Initial fetch for report data if on report page
+if (document.getElementById('report-table-body')) {
+    fetchReportData();
 }

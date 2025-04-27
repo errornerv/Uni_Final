@@ -1,4 +1,3 @@
-
 import hashlib
 import os
 import logging
@@ -181,29 +180,53 @@ class TrafficBlockchain:
 
 # تابع اصلی
 def main():
-    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    traffic_blockchain = TrafficBlockchain()
-    total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Orders", file=sys.stdout)):
-        traffic_blockchain.add_ordered_block(block)
-        tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}")
-    # گزارش خلاصه
-    priority_orders = 0
-    congested_nodes = {}
-    total_congested = 0
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM new_orders WHERE order_type = 'Priority'")
-    priority_orders = c.fetchone()[0]
-    c.execute("SELECT node_id, COUNT(*) FROM new_orders WHERE congestion_level IN ('Medium', 'High') GROUP BY node_id")
-    for row in c.fetchall():
-        congested_nodes[row[0]] = row[1]
-        total_congested += row[1]
-    conn.close()
-    print("\nNew Orders Report:")
-    print(f"Total Priority Orders: {priority_orders}")
-    print(f"Total Congested Points: {total_congested}")
-    print("Congested Nodes Distribution:")
-    for node, count in congested_nodes.items():
-        print(f"Node {node}: {count} congested points")
+    try:
+        block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        traffic_blockchain = TrafficBlockchain()
+        total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
+        processed_blocks = 0
+        priority_orders = 0
+        total_congested = 0
+        
+        for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Orders", file=sys.stdout)):
+            if traffic_blockchain.add_ordered_block(block):
+                processed_blocks += 1
+                if block.order_type == "Priority":
+                    priority_orders += 1
+                if block.congestion_layer["level"] in ["Medium", "High"]:
+                    total_congested += 1
+                tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}")
+
+        # گزارش خلاصه
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("SELECT node_id, COUNT(*) FROM new_orders WHERE congestion_level IN ('Medium', 'High') GROUP BY node_id")
+        congested_nodes = dict(c.fetchall())
+        conn.close()
+
+        summary = {
+            "total_blocks": processed_blocks,
+            "priority_orders": priority_orders,
+            "total_congested_points": total_congested,
+            "congested_nodes": congested_nodes
+        }
+
+        return {
+            "status": "success",
+            "block_count": processed_blocks,
+            "summary": f"Processed {processed_blocks} blocks, {priority_orders} priority orders, {total_congested} congested points",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 4: New orders: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

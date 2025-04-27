@@ -20,51 +20,63 @@
         }
     </style>
 </head>
-<body class="bg-gray-100">
-    <!-- Header -->
-    <header class="bg-blue-600 text-white p-4">
-        <h1 class="text-2xl font-bold">Traffic Management Dashboard</h1>
-    </header>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="container mx-auto p-4 max-w-5xl">
+        <!-- Header -->
+        <header class="bg-blue-600 text-white p-4 rounded-lg shadow-md mb-6">
+            <h1 class="text-3xl font-bold text-center animate-pulse">Traffic Management Dashboard</h1>
+        </header>
 
-    <!-- Run Project Button -->
-    <div class="container mx-auto p-4">
-        <button id="run-project" class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition" onclick="runProject()">
-            Run Project
-        </button>
-    </div>
+        <!-- Run Project Button and Reset Button -->
+        <div class="flex justify-center space-x-4 mb-8">
+            <button id="run-project" class="bg-green-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-green-600 transition-transform transform hover:scale-105" onclick="runProject()">
+                Run Project
+            </button>
+            <button id="reset-scripts" class="bg-red-500 text-white px-6 py-3 rounded-lg shadow-md hover:bg-red-600 transition-transform transform hover:scale-105" onclick="resetScripts()">
+                Reset Scripts
+            </button>
+        </div>
 
-    <!-- Main Content -->
-    <div class="container mx-auto p-4 flex flex-col md:flex-row">
-        <!-- Sidebar -->
-        <aside class="w-full md:w-1/4 bg-white p-4 rounded-lg shadow-md mb-4 md:mb-0">
-            <h2 class="text-xl font-semibold mb-4">Navigation</h2>
-            <ul class="space-y-2">
-                <li><a href="/" class="text-blue-500 hover:underline">Home</a></li>
-                <li><a href="/report" class="text-blue-500 hover:underline">Reports</a></li>
-            </ul>
-        </aside>
+        <!-- Report Links -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Reports</h2>
+            <div class="report-links grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <a href="/report/code01" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code01 Report</a>
+                <a href="/report/code02" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code02 Report</a>
+                <a href="/report/code03" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code03 Report</a>
+                <a href="/report/code04" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code04 Report</a>
+                <a href="/report/code05" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code05 Report</a>
+                <a href="/report/code06" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code06 Report</a>
+                <a href="/report/code07" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code07 Report</a>
+                <a href="/report/code08" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code08 Report</a>
+                <a href="/report/code09" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code09 Report</a>
+                <a href="/report/code10" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code10 Report</a>
+                <a href="/report/code11" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code11 Report</a>
+                <a href="/report/code12" class="bg-teal-500 text-white px-4 py-2 rounded-lg text-center font-medium cursor-pointer transition-transform transform hover:scale-105 hover:bg-teal-600">Code12 Report</a>
+            </div>
+        </div>
 
         <!-- Main Content Area -->
-        <main class="w-full md:w-3/4 md:ml-4 bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold mb-4">Execute Modules</h2>
+        <main class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Execute Modules</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
                 <!-- Module Buttons -->
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code01')">Run Code 01: Initial Data</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code02')">Run Code 02: Congestion Detection</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code03')">Run Code 03: Managed Traffic</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code04')">Run Code 04: New Orders</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code05')">Run Code 05: Real-Time Orders</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code06')">Run Code 06: Data Preparation</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code07')">Run Code 07: Model Training</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code08')">Run Code 08: Advanced Report</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code09')">Run Code 09: Smart Traffic</button>
-                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600" onclick="runModule('code10')">Run Code 10: Self-Healing</button>
-                <button class="module-button bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600" onclick="runModule('code11')">Run Code 11: Resource Optimization</button>
-                <button class="module-button bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600" onclick="runModule('code12')">Run Code 12: Predictive Analysis</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code01')">Run Code 01: Initial Data</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code02')">Run Code 02: Congestion Detection</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code03')">Run Code 03: Managed Traffic</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code04')">Run Code 04: New Orders</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code05')">Run Code 05: Real-Time Orders</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code06')">Run Code 06: Data Preparation</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code07')">Run Code 07: Model Training</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code08')">Run Code 08: Advanced Report</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code09')">Run Code 09: Smart Traffic</button>
+                <button class="module-button bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transform hover:scale-105" onclick="runModule('code10')">Run Code 10: Self-Healing</button>
+                <button class="module-button bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transform hover:scale-105" onclick="runModule('code11')">Run Code 11: Resource Optimization</button>
+                <button class="module-button bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 transform hover:scale-105" onclick="runModule('code12')">Run Code 12: Predictive Analysis</button>
             </div>
 
             <!-- Live Output -->
-            <h2 class="text-xl font-semibold mb-4">Live Output</h2>
+            <h2 class="text-2xl font-semibold mb-4 text-center text-gray-800">Live Output</h2>
             <div id="live-output" class="bg-gray-800 text-white p-4 rounded-lg"></div>
         </main>
     </div>
@@ -72,60 +84,104 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
     <script>
         let socket = null;
+        let isSocketConnected = false;
 
         function connectSocketIO() {
-            socket = io.connect('http://' + window.location.host, {
-                reconnection: true,
-                reconnectionDelay: 1000
-            });
+            if (!isSocketConnected) {
+                socket = io.connect('http://' + window.location.host, {
+                    reconnection: true,
+                    reconnectionDelay: 1000
+                });
 
-            socket.on('connect', function() {
-                const outputDiv = document.getElementById('live-output');
-                outputDiv.innerHTML += 'Connected to SocketIO server<br>';
-                outputDiv.scrollTop = outputDiv.scrollHeight;
-            });
+                socket.on('connect', function() {
+                    isSocketConnected = true;
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'Connected to SocketIO server<br> ';
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                });
 
-            socket.on('output', function(data) {
-                const outputDiv = document.getElementById('live-output');
-                outputDiv.innerHTML += data + '<br>';
-                outputDiv.scrollTop = outputDiv.scrollHeight;
-            });
+                socket.on('output', function(data) {
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += data + '<br>';
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                });
 
-            socket.on('disconnect', function() {
-                const outputDiv = document.getElementById('live-output');
-                outputDiv.innerHTML += 'SocketIO connection closed. Reconnecting...<br>';
-            });
+                socket.on('disconnect', function() {
+                    isSocketConnected = false;
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'SocketIO connection closed. Reconnecting...<br>';
+                });
 
-            socket.on('connect_error', function(error) {
-                const outputDiv = document.getElementById('live-output');
-                outputDiv.innerHTML += 'SocketIO connection error: ' + error + '<br>';
-            });
+                socket.on('connect_error', function(error) {
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'SocketIO connection error: ' + error + '<br>';
+                });
+            }
         }
 
         function runProject() {
-            document.getElementById('run-project').style.display = 'none';
+            const button = document.getElementById('run-project');
+            button.disabled = true;
+            button.style.display = 'none';
             fetch('/run_project', { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status !== 'started') {
-                        document.getElementById('run-project').style.display = 'block';
+                    if (data.status === 'error') {
+                        const outputDiv = document.getElementById('live-output');
+                        outputDiv.innerHTML += data.message + '<br>';
+                        button.style.display = 'block';
+                        button.disabled = false;
                     }
+                })
+                .catch(error => {
+                    button.style.display = 'block';
+                    button.disabled = false;
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'Error running project: ' + error + '<br>';
                 });
-            connectSocketIO();
         }
 
         function runModule(code) {
+            const button = document.querySelector(`button[onclick="runModule('${code}')"]`);
+            button.disabled = true;
             document.getElementById('live-output').innerHTML = '';
             fetch(`/run_module/${code}`, { method: 'POST' })
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === 'started') {
-                        connectSocketIO();
+                    if (data.status === 'error') {
+                        const outputDiv = document.getElementById('live-output');
+                        outputDiv.innerHTML += data.message + '<br>';
                     }
+                })
+                .catch(error => {
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'Error running module: ' + error + '<br>';
+                })
+                .finally(() => {
+                    button.disabled = false;
                 });
         }
 
-        // اتصال اولیه
+        function resetScripts() {
+            const button = document.getElementById('reset-scripts');
+            button.disabled = true;
+            fetch('/reset_scripts', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += data.message + '<br>';
+                    outputDiv.scrollTop = outputDiv.scrollHeight;
+                })
+                .catch(error => {
+                    const outputDiv = document.getElementById('live-output');
+                    outputDiv.innerHTML += 'Error resetting scripts: ' + error + '<br>';
+                })
+                .finally(() => {
+                    button.disabled = false;
+                });
+        }
+
+        // Connect to Socket.IO only once on page load
         connectSocketIO();
     </script>
 </body>

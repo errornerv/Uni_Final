@@ -1,4 +1,3 @@
-
 import hashlib
 import os
 import logging
@@ -185,28 +184,56 @@ class TrafficBlockchain:
 
 # تابع اصلی
 def main():
-    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    traffic_blockchain = TrafficBlockchain()
-    total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Real-Time Orders", file=sys.stdout)):
-        traffic_blockchain.add_real_time_block(block)
-        delay = 0.02 if block.order_type == "Priority" and os.getenv("DEMO_MODE") == "True" else 0.05 if block.order_type == "Priority" else 0.1
-        tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}, Delay: {delay}s")
-    # گزارش خلاصه
-    priority_orders = 0
-    total_congested = 0
-    real_time_blocks = 0
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM real_time_orders WHERE order_type = 'Priority'")
-    priority_orders = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM real_time_orders WHERE congestion_level IN ('Medium', 'High')")
-    total_congested = c.fetchone()[0]
-    c.execute("SELECT COUNT(*) FROM real_time_orders")
-    real_time_blocks = c.fetchone()[0]
-    conn.close()
-    print("\nReal-Time Orders Report:")
-    print(f"Total Real-Time Blocks Processed: {real_time_blocks}")
-    print(f"Total Priority Orders: {priority_orders}")
-    print(f"Total Congested Points: {total_congested}")
+    try:
+        block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        traffic_blockchain = TrafficBlockchain()
+        total_blocks = len(traffic_blockchain.chain[1:]) if not block_limit else min(block_limit, len(traffic_blockchain.chain[1:]))
+        processed_blocks = 0
+        priority_orders = 0
+        total_congested = 0
+        real_time_blocks = 0
+        
+        for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:total_blocks + 1] if block_limit else traffic_blockchain.chain[1:], desc="Processing Real-Time Orders", file=sys.stdout)):
+            if traffic_blockchain.add_real_time_block(block):
+                processed_blocks += 1
+                real_time_blocks += 1
+                if block.order_type == "Priority":
+                    priority_orders += 1
+                if block.congestion_layer["level"] in ["Medium", "High"]:
+                    total_congested += 1
+                delay = 0.02 if block.order_type == "Priority" and os.getenv("DEMO_MODE") == "True" else 0.05 if block.order_type == "Priority" else 0.1
+                tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Order Type: {block.order_type}, Delay: {delay}s")
+
+        # گزارش خلاصه
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM real_time_orders")
+        real_time_blocks_db = c.fetchone()[0]
+        conn.close()
+
+        summary = {
+            "total_blocks": processed_blocks,
+            "real_time_blocks": real_time_blocks_db,
+            "priority_orders": priority_orders,
+            "total_congested_points": total_congested
+        }
+
+        return {
+            "status": "success",
+            "block_count": processed_blocks,
+            "summary": f"Processed {processed_blocks} blocks, {real_time_blocks_db} real-time blocks, {priority_orders} priority orders, {total_congested} congested points",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 5: Real-time orders: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

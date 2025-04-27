@@ -53,17 +53,21 @@ def init_db():
                   signature TEXT)''')
     conn.commit()
     conn.close()
+    logging.info(f"Initialized output database at {output_db}")
 
 def save_to_db(block):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO healing_network VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
-               block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_level, block.traffic_redistribution, block.event_type, block.healing_action,
-               block.predicted_congestion, block.signature.hex() if block.signature else None))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("INSERT INTO healing_network VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
+                   block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
+                   block.congestion_level, block.traffic_redistribution, block.event_type, block.healing_action,
+                   block.predicted_congestion, block.signature.hex() if block.signature else None))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving block to database: {e}")
 
 # کلاس بلاک
 class HealingBlock:
@@ -183,28 +187,32 @@ class TrafficBlockchain:
         self.load_from_db(limit)
 
     def load_from_db(self, limit):
-        conn = sqlite3.connect(input_db)
-        c = conn.cursor()
-        query = "SELECT * FROM smart_traffic"
-        if limit:
-            query += f" LIMIT {limit}"
-        c.execute(query)
-        rows = c.fetchall()
-        for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
-            traffic_layer = {"volume": row[3], "type": row[2]}
-            health_layer = {"status": row[4], "latency": row[5]}
-            block = HealingBlock(row[0], row[1], traffic_layer, health_layer, row[6], row[8], 
-                                row[9], row[10], "None", row[11])
-            block.hash = row[7]
-            self.chain.append(block)
-            if row[1] not in self.cache:
-                self.cache[row[1]] = []
-            self.cache[row[1]].append(block)
-            if len(self.cache[row[1]]) > 4:
-                self.cache[row[1]].pop(0)
-            tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
-        conn.close()
-        print(f"Loaded {len(rows)} blocks from {input_db}")
+        try:
+            conn = sqlite3.connect(input_db)
+            c = conn.cursor()
+            query = "SELECT * FROM smart_traffic"
+            if limit:
+                query += f" LIMIT {limit}"
+            c.execute(query)
+            rows = c.fetchall()
+            for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
+                traffic_layer = {"volume": row[3], "type": row[2]}
+                health_layer = {"status": row[4], "latency": row[5]}
+                block = HealingBlock(row[0], row[1], traffic_layer, health_layer, row[6], row[8], 
+                                    row[9], row[10], "None", row[11])
+                block.hash = row[7]
+                self.chain.append(block)
+                if row[1] not in self.cache:
+                    self.cache[row[1]] = []
+                self.cache[row[1]].append(block)
+                if len(self.cache[row[1]]) > 4:
+                    self.cache[row[1]].pop(0)
+                tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
+            conn.close()
+            print(f"Loaded {len(rows)} blocks from {input_db}")
+        except sqlite3.Error as e:
+            logging.error(f"Error loading blocks from DB: {e}")
+            self.chain = []
 
     def add_block(self, block):
         traffic_volume = block.traffic_layer["volume"]
@@ -248,34 +256,57 @@ class TrafficBlockchain:
         return new_block
 
     def generate_report(self):
-        total_blocks = len(self.chain)
-        high_congestion = sum(1 for block in self.chain if block.congestion_level == "High")
-        self_heal_actions = sum(1 for block in self.chain if block.healing_action != "None")
+        total_blocks = len(self.chain[1:])  # بدون جنسیس
+        high_congestion = sum(1 for block in self.chain[1:] if block.congestion_level == "High")
+        self_heal_actions = sum(1 for block in self.chain[1:] if block.healing_action != "None")
 
-        print("\nSelf-Healing Network Report:")
-        print(f"Total Blocks Processed: {total_blocks}")
-        print(f"High Congestion Blocks: {high_congestion}")
-        print(f"Total Self-Heal Actions Taken: {self_heal_actions}")
+        report = {
+            "total_blocks": total_blocks,
+            "high_congestion_blocks": high_congestion,
+            "self_heal_actions": self_heal_actions
+        }
+        return report
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    traffic_blockchain = TrafficBlockchain(limit)
-    last_time = time.time()
-
-    for node in nodes:
-        node_status[node]["current_traffic"] = 0
-        node_status[node]["active"] = True
-
-    total_blocks = len(traffic_blockchain.chain[1:])
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Self-Heal Blocks", file=sys.stdout)):
-        traffic_blockchain.add_block(block)
-        print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
-        print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
-              f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
-              f"Predicted Congestion: {block.predicted_congestion}, Redistribution: {block.traffic_redistribution}, "
-              f"Event: {block.event_type}, Healing: {block.healing_action}")
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        traffic_blockchain = TrafficBlockchain(limit)
         last_time = time.time()
 
-    traffic_blockchain.generate_report()
+        for node in nodes:
+            node_status[node]["current_traffic"] = 0
+            node_status[node]["active"] = True
+
+        total_blocks = len(traffic_blockchain.chain[1:])
+        for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Self-Heal Blocks", file=sys.stdout)):
+            traffic_blockchain.add_block(block)
+            print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
+            print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
+                  f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
+                  f"Predicted Congestion: {block.predicted_congestion}, Redistribution: {block.traffic_redistribution}, "
+                  f"Event: {block.event_type}, Healing: {block.healing_action}")
+            last_time = time.time()
+
+        report = traffic_blockchain.generate_report()
+        logging.info(f"Self-Healing Network Report: {report}")
+
+        return {
+            "status": "success",
+            "block_count": report["total_blocks"],
+            "summary": f"Processed {report['total_blocks']} blocks, {report['self_heal_actions']} self-heal actions",
+            "details": report
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 10: Self-healing network: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process self-healing blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

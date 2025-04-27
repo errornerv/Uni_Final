@@ -53,17 +53,21 @@ def init_db():
                   resource_allocation TEXT, signature TEXT)''')
     conn.commit()
     conn.close()
+    logging.info(f"Initialized output database at {output_db}")
 
 def save_to_db(block):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO optimized_resources VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
-               block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_level, block.traffic_redistribution, block.event_type, block.healing_action,
-               block.predicted_congestion, block.resource_allocation, block.signature.hex() if block.signature else None))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("INSERT INTO optimized_resources VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
+                   block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
+                   block.congestion_level, block.traffic_redistribution, block.event_type, block.healing_action,
+                   block.predicted_congestion, block.resource_allocation, block.signature.hex() if block.signature else None))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving block to database: {e}")
 
 # کلاس بلاک
 class OptimizedBlock:
@@ -163,29 +167,33 @@ class TrafficBlockchain:
         self.load_from_db(limit)
 
     def load_from_db(self, limit):
-        conn = sqlite3.connect(input_db)
-        c = conn.cursor()
-        query = "SELECT * FROM healing_network"
-        if limit:
-            query += f" LIMIT {limit}"
-        c.execute(query)
-        rows = c.fetchall()
-        for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
-            traffic_layer = {"volume": row[3], "type": row[2]}
-            health_layer = {"status": row[4], "latency": row[5]}
-            signature = bytes.fromhex(row[13]) if row[13] else None
-            block = OptimizedBlock(row[0], row[1], traffic_layer, health_layer, row[6], row[8], 
-                                  row[9], row[10], row[11], row[12], None, signature)
-            block.hash = row[7]
-            self.chain.append(block)
-            if row[1] not in self.cache:
-                self.cache[row[1]] = []
-            self.cache[row[1]].append(block)
-            if len(self.cache[row[1]]) > 4:
-                self.cache[row[1]].pop(0)
-            tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
-        conn.close()
-        print(f"Loaded {len(rows)} blocks from {input_db}")
+        try:
+            conn = sqlite3.connect(input_db)
+            c = conn.cursor()
+            query = "SELECT * FROM healing_network"
+            if limit:
+                query += f" LIMIT {limit}"
+            c.execute(query)
+            rows = c.fetchall()
+            for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
+                traffic_layer = {"volume": row[3], "type": row[2]}
+                health_layer = {"status": row[4], "latency": row[5]}
+                signature = bytes.fromhex(row[13]) if row[13] else None
+                block = OptimizedBlock(row[0], row[1], traffic_layer, health_layer, row[6], row[8], 
+                                      row[9], row[10], row[11], row[12], None, signature)
+                block.hash = row[7]
+                self.chain.append(block)
+                if row[1] not in self.cache:
+                    self.cache[row[1]] = []
+                self.cache[row[1]].append(block)
+                if len(self.cache[row[1]]) > 4:
+                    self.cache[row[1]].pop(0)
+                tqdm.write(f"Loaded block for Node {row[1]} at {row[0]}")
+            conn.close()
+            print(f"Loaded {len(rows)} blocks from {input_db}")
+        except sqlite3.Error as e:
+            logging.error(f"Error loading blocks from DB: {e}")
+            self.chain = []
 
     def add_block(self, block):
         traffic_volume = block.traffic_layer["volume"]
@@ -215,40 +223,60 @@ class TrafficBlockchain:
         return new_block
 
     def generate_report(self):
-        total_blocks = len(self.chain)
-        high_congestion = sum(1 for block in self.chain if block.congestion_level == "High")
-        resource_allocations = sum(1 for block in self.chain if block.resource_allocation != "No resource optimization needed")
-        high_traffic_nodes = set()
-        for block in self.chain:
-            if block.traffic_layer["volume"] > 50:
-                high_traffic_nodes.add(block.node_id)
+        total_blocks = len(self.chain[1:])  # بدون جنسیس
+        high_congestion = sum(1 for block in self.chain[1:] if block.congestion_level == "High")
+        resource_allocations = sum(1 for block in self.chain[1:] if block.resource_allocation != "No resource optimization needed")
+        high_traffic_nodes = set(block.node_id for block in self.chain[1:] if block.traffic_layer["volume"] > 50)
 
-        print("\nResource Optimization Report:")
-        print(f"Total Blocks Processed: {total_blocks}")
-        print(f"High Congestion Blocks: {high_congestion}")
-        print(f"Total Resource Allocations: {resource_allocations}")
-        print(f"High Traffic Nodes: {', '.join(high_traffic_nodes)}")
+        report = {
+            "total_blocks": total_blocks,
+            "high_congestion_blocks": high_congestion,
+            "resource_allocations": resource_allocations,
+            "high_traffic_nodes": list(high_traffic_nodes)
+        }
+        return report
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    traffic_blockchain = TrafficBlockchain(limit)
-    last_time = time.time()
-
-    for node in nodes:
-        node_status[node]["current_traffic"] = 0
-        node_status[node]["active"] = True
-        node_status[node]["allocated_bandwidth"] = 50
-
-    total_blocks = len(traffic_blockchain.chain[1:])
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Optimized Resource Blocks", file=sys.stdout)):
-        traffic_blockchain.add_block(block)
-        print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
-        print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
-              f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
-              f"Predicted Congestion: {block.predicted_congestion}, "
-              f"Resource Allocation: {block.resource_allocation}")
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        traffic_blockchain = TrafficBlockchain(limit)
         last_time = time.time()
 
-    traffic_blockchain.generate_report()
+        for node in nodes:
+            node_status[node]["current_traffic"] = 0
+            node_status[node]["active"] = True
+            node_status[node]["allocated_bandwidth"] = 50
+
+        total_blocks = len(traffic_blockchain.chain[1:])
+        for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Optimized Resource Blocks", file=sys.stdout)):
+            traffic_blockchain.add_block(block)
+            print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
+            print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
+                  f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
+                  f"Predicted Congestion: {block.predicted_congestion}, "
+                  f"Resource Allocation: {block.resource_allocation}")
+            last_time = time.time()
+
+        report = traffic_blockchain.generate_report()
+        logging.info(f"Resource Optimization Report: {report}")
+
+        return {
+            "status": "success",
+            "block_count": report["total_blocks"],
+            "summary": f"Processed {report['total_blocks']} blocks, {report['resource_allocations']} resource allocations",
+            "details": report
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 11: Resource optimization: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process resource optimization blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

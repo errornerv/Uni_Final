@@ -1,4 +1,3 @@
-
 import hashlib
 import os
 import numpy as np
@@ -159,7 +158,7 @@ class Blockchain:
 
     def detect_congestion(self, node_id):
         node_blocks = self.cache.get(node_id, [])
-        if len(node_blocks) < 4:
+        if not node_blocks:
             return {"is_congested": 0, "score": 0.0, "impact": 0.0, "level": "Low"}
         traffic_values = [b.traffic_layer["volume"] for b in node_blocks]
         current_traffic = traffic_values[-1]
@@ -180,36 +179,60 @@ class Blockchain:
 
 # تابع اصلی
 def main():
-    block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    blockchain = Blockchain()
-    total_blocks = len(blockchain.chain[1:]) if not block_limit else min(block_limit, len(blockchain.chain[1:]))
-    
-    def process_block(block):
-        congestion_layer = blockchain.detect_congestion(block.node_id)
-        new_block = Block(block.timestamp, block.node_id, block.traffic_layer, block.health_layer, block.previous_hash, congestion_layer)
-        new_block.hash = block.hash
-        new_block.sign_block(node_keys[block.node_id])
-        if blockchain.add_block(new_block):
-            return new_block
-        return None
+    try:
+        block_limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        blockchain = Blockchain()
+        total_blocks = len(blockchain.chain[1:]) if not block_limit else min(block_limit, len(blockchain.chain[1:]))
+        processed_blocks = 0
+        
+        def process_block(block):
+            congestion_layer = blockchain.detect_congestion(block.node_id)
+            new_block = Block(block.timestamp, block.node_id, block.traffic_layer, block.health_layer, block.previous_hash, congestion_layer)
+            new_block.hash = block.hash
+            new_block.sign_block(node_keys[block.node_id])
+            if blockchain.add_block(new_block):
+                return new_block
+            return None
 
-    with ThreadPoolExecutor() as executor:
-        blocks_to_process = blockchain.chain[1:total_blocks + 1] if block_limit else blockchain.chain[1:]
-        new_blocks = list(tqdm(executor.map(process_block, blocks_to_process), total=total_blocks, desc="Detecting Congestion", file=sys.stdout))
-        for idx, block in enumerate(new_blocks):
-            if block:
-                tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
+        with ThreadPoolExecutor() as executor:
+            blocks_to_process = blockchain.chain[1:total_blocks + 1] if block_limit else blockchain.chain[1:]
+            new_blocks = list(tqdm(executor.map(process_block, blocks_to_process), total=total_blocks, desc="Detecting Congestion", file=sys.stdout))
+            for idx, block in enumerate(new_blocks):
+                if block:
+                    processed_blocks += 1
+                    tqdm.write(f"Processed {idx + 1}/{total_blocks} blocks - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
 
-    # گزارش خلاصه
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("SELECT COUNT(*) FROM congestion_blocks WHERE congestion_level = 'High'")
-    high_congestion = c.fetchone()[0]
-    c.execute("SELECT AVG(congestion_score) FROM congestion_blocks")
-    avg_score = c.fetchone()[0] or 0.0
-    conn.close()
-    print("\nCongestion Summary:")
-    print(f"Total Blocks: {len(blockchain.chain)}")
-    print(f"High Congestion Points: {high_congestion}")
-    print(f"Average Congestion Score: {avg_score:.2f}")
+        # گزارش خلاصه
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("SELECT COUNT(*) FROM congestion_blocks WHERE congestion_level = 'High'")
+        high_congestion = c.fetchone()[0]
+        c.execute("SELECT AVG(congestion_score) FROM congestion_blocks")
+        avg_score = c.fetchone()[0] or 0.0
+        conn.close()
+        
+        summary = {
+            "total_blocks": len(blockchain.chain),
+            "high_congestion_points": high_congestion,
+            "average_congestion_score": round(avg_score, 2)
+        }
+        
+        return {
+            "status": "success",
+            "block_count": processed_blocks,
+            "summary": f"Processed {processed_blocks} blocks, {high_congestion} high congestion points, avg score: {avg_score:.2f}",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 2: Congestion detection: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process blocks",
+            "error": str(e)
+        }
+
+if __name__ == "__main__":
+    result = main()
+    print(result)

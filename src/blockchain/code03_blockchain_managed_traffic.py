@@ -123,15 +123,11 @@ def redistribute_traffic(node_id, excess_traffic):
 # محاسبه سطح تراکم
 def calculate_congestion_level(traffic_volume, latency, max_capacity):
     try:
-        # محاسبه امتیاز تراکم بر اساس حجم ترافیک و تأخیر
-        congestion_score = (traffic_volume / max_capacity) * 0.7 + (latency / 10) * 0.3  # فرمول ترکیبی
-        congestion_score = min(max(congestion_score, 0.0), 1.0)  # محدود کردن به بازه 0 تا 1
+        congestion_score = (traffic_volume / max_capacity) * 0.7 + (latency / 10) * 0.3
+        congestion_score = min(max(congestion_score, 0.0), 1.0)
+        latency_impact = (latency / 10) * (traffic_volume / max_capacity)
+        latency_impact = min(max(latency_impact, 0.0), 1.0)
         
-        # محاسبه تأثیر تأخیر
-        latency_impact = (latency / 10) * (traffic_volume / max_capacity)  # تأخیر نسبی
-        latency_impact = min(max(latency_impact, 0.0), 1.0)  # محدود کردن به بازه 0 تا 1
-        
-        # تعیین سطح تراکم
         if congestion_score > 0.8:
             level = "High"
         elif congestion_score > 0.5:
@@ -152,7 +148,7 @@ def suggest_traffic_management(block):
 
         traffic_volume = block.traffic_layer["volume"]
         congestion_level = block.congestion_layer["level"]
-        max_capacity = node_status[block.node_id]["max_capacity"]
+        max_capacity = node_status.get(block.node_id, {"max_capacity": 100})["max_capacity"]
 
         if congestion_level in ["Medium", "High"] and traffic_volume > max_capacity:
             excess_traffic = traffic_volume - max_capacity
@@ -193,7 +189,6 @@ class TrafficBlockchain:
             for row in tqdm(rows, desc="Loading blocks from DB", file=sys.stdout):
                 traffic_layer = {"volume": float(row[3] or 0.0), "type": row[2] or "Data"}
                 health_layer = {"status": row[4] or "Normal", "latency": float(row[5] or 0.0)}
-                # محاسبه سطح تراکم
                 max_capacity = node_status.get(row[1], {"max_capacity": 100})["max_capacity"]
                 congestion_layer = calculate_congestion_level(traffic_layer["volume"], health_layer["latency"], max_capacity)
                 try:
@@ -230,13 +225,40 @@ class TrafficBlockchain:
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    traffic_blockchain = TrafficBlockchain(limit)
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        traffic_blockchain = TrafficBlockchain(limit)
+        processed_blocks = 0
+        high_congestion_count = 0
 
-    for block in tqdm(traffic_blockchain.chain, desc="Managing Traffic", file=sys.stdout):
-        traffic_blockchain.add_block(block)
-        print(f"Processed block - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
+        for block in tqdm(traffic_blockchain.chain, desc="Managing Traffic", file=sys.stdout):
+            traffic_blockchain.add_block(block)
+            processed_blocks += 1
+            if block.congestion_layer["level"] == "High":
+                high_congestion_count += 1
+            print(f"Processed block - Node: {block.node_id}, Congestion: {block.congestion_layer['level']}")
+
+        summary = {
+            "total_blocks": processed_blocks,
+            "high_congestion_count": high_congestion_count
+        }
+
+        return {
+            "status": "success",
+            "block_count": processed_blocks,
+            "summary": f"Processed {processed_blocks} blocks, {high_congestion_count} high congestion points",
+            "details": summary
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 3: Managed traffic: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process blocks",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
-    main()
+    result = main()
+    print(result)

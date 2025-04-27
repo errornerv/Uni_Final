@@ -62,24 +62,31 @@ def init_db():
                  (timestamp TEXT, medium_threshold REAL, high_threshold REAL, high_blocks INTEGER)''')
     conn.commit()
     conn.close()
+    logging.info(f"Initialized output database at {output_db}")
 
 def save_to_db(block):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO smart_traffic VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-              (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
-               block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
-               block.congestion_level, block.traffic_redistribution, block.event_type, block.predicted_congestion))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("INSERT INTO smart_traffic VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                  (block.timestamp, block.node_id, block.traffic_layer["type"], block.traffic_layer["volume"],
+                   block.health_layer["status"], block.health_layer["latency"], block.previous_hash, block.hash,
+                   block.congestion_level, block.traffic_redistribution, block.event_type, block.predicted_congestion))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving block to database: {e}")
 
 def save_optimization_log(timestamp, medium_threshold, high_threshold, high_blocks):
-    conn = sqlite3.connect(output_db)
-    c = conn.cursor()
-    c.execute("INSERT INTO optimization_log VALUES (?, ?, ?, ?)",
-              (timestamp, medium_threshold, high_threshold, high_blocks))
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect(output_db)
+        c = conn.cursor()
+        c.execute("INSERT INTO optimization_log VALUES (?, ?, ?, ?)",
+                  (timestamp, medium_threshold, high_threshold, high_blocks))
+        conn.commit()
+        conn.close()
+    except sqlite3.Error as e:
+        logging.error(f"Error saving optimization log: {e}")
 
 # کلاس بلاک
 class SmartTrafficBlock:
@@ -281,48 +288,65 @@ class TrafficBlockchain:
         print(f"Thresholds updated: Medium={thresholds['medium']}, High={thresholds['high']}, High Blocks={best_high_count}")
 
     def generate_report(self):
-        total_blocks = len(self.chain)
-        high_congestion = sum(1 for block in self.chain if block.congestion_level == "High")
-        accurate_predictions = sum(1 for block in self.chain if block.congestion_level == block.predicted_congestion)
+        total_blocks = len(self.chain[1:])  # بدون جنسیس
+        high_congestion = sum(1 for block in self.chain[1:] if block.congestion_level == "High")
+        accurate_predictions = sum(1 for block in self.chain[1:] if block.congestion_level == block.predicted_congestion)
         accuracy = (accurate_predictions / total_blocks * 100) if total_blocks > 0 else 0
 
-        print("\nSmart Traffic Management Report:")
-        print(f"Total Blocks Processed: {total_blocks}")
-        print(f"High Congestion Blocks: {high_congestion}")
-        print(f"Prediction Accuracy: {accuracy:.2f}% ({accurate_predictions}/{total_blocks} correct)")
+        report = {
+            "total_blocks": total_blocks,
+            "high_congestion_blocks": high_congestion,
+            "prediction_accuracy": round(accuracy, 2),
+            "accurate_predictions": accurate_predictions
+        }
+        return report
 
 # تابع اصلی
 def main():
-    limit = 100 if os.getenv("DEMO_MODE") == "True" else None
-    init_db()
-    model, le_node_id, le_traffic_type, le_network_health = load_model_and_encoders()
-    traffic_blockchain = TrafficBlockchain(limit)
-    last_time = time.time()
-
-    for node in nodes:
-        node_status[node]["current_traffic"] = 0
-        node_status[node]["active"] = node != "Genesis"
-
-    total_blocks = len(traffic_blockchain.chain[1:])
-    for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Smart Traffic Blocks", file=sys.stdout)):
-        traffic_blockchain.add_block(block, model, le_node_id, le_traffic_type, le_network_health)
-        print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
-        print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
-              f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
-              f"Predicted Congestion: {block.predicted_congestion}, Redistribution: {block.traffic_redistribution}, "
-              f"Event: {block.event_type}")
-        
-        if len(traffic_blockchain.block_history) >= 100:
-            traffic_blockchain.optimize_thresholds()
-            traffic_blockchain.block_history = traffic_blockchain.block_history[-100:]
-        
+    try:
+        limit = 100 if os.getenv("DEMO_MODE") == "True" else None
+        init_db()
+        model, le_node_id, le_traffic_type, le_network_health = load_model_and_encoders()
+        traffic_blockchain = TrafficBlockchain(limit)
         last_time = time.time()
 
-    traffic_blockchain.generate_report()
+        for node in nodes:
+            node_status[node]["current_traffic"] = 0
+            node_status[node]["active"] = node != "Genesis"
+
+        total_blocks = len(traffic_blockchain.chain[1:])
+        for idx, block in enumerate(tqdm(traffic_blockchain.chain[1:], desc="Processing Smart Traffic Blocks", file=sys.stdout)):
+            traffic_blockchain.add_block(block, model, le_node_id, le_traffic_type, le_network_health)
+            print(f"\nProcessed block {idx + 1}/{total_blocks} at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}:")
+            print(f"Node: {block.node_id}, Traffic: {block.traffic_layer['volume']:.2f} MB/s, "
+                  f"Health: {block.health_layer['status']}, Congestion: {block.congestion_level}, "
+                  f"Predicted Congestion: {block.predicted_congestion}, Redistribution: {block.traffic_redistribution}, "
+                  f"Event: {block.event_type}")
+            
+            if len(traffic_blockchain.block_history) >= 100:
+                traffic_blockchain.optimize_thresholds()
+                traffic_blockchain.block_history = traffic_blockchain.block_history[-100:]
+            
+            last_time = time.time()
+
+        report = traffic_blockchain.generate_report()
+        logging.info(f"Smart Traffic Management Report: {report}")
+
+        return {
+            "status": "success",
+            "block_count": report["total_blocks"],
+            "summary": f"Processed {report['total_blocks']} blocks, {report['high_congestion_blocks']} high congestion blocks",
+            "details": report
+        }
+    except Exception as e:
+        logging.error(f"Error in Step 9: Managing smart traffic: {e}")
+        return {
+            "status": "error",
+            "block_count": 0,
+            "summary": "Failed to process smart traffic blocks",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
-    try:
-        main()
-    except Exception as e:
-        logging.error(f"Error in Step 9: Managing smart traffic...: {e}")
-        raise
+    result = main()
+    print(result)

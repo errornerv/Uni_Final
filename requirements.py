@@ -18,6 +18,7 @@ packages = [
     "openpyxl==3.1.5",
     "gevent==24.2.1",
     "gevent-websocket==0.10.1"
+    "xlsxwriter==3.1.2"
 ]
 
 def install_packages():
