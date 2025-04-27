@@ -19,6 +19,7 @@ packages = [
     "gevent==24.2.1",
     "gevent-websocket==0.10.1"
     "xlsxwriter==3.1.2"
+    "gevent ==24.2.1"
 ]
 
 def install_packages():
