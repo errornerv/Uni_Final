@@ -71,13 +71,12 @@ Hardware: Minimum 4GB RAM and 2GHz CPU (8GB RAM recommended for faster processin
 5. Installation
 Follow these steps to set up the project environment:
 5.1. Clone or Download the Project
-Download the project files or clone the repository to your local machine. For example:
-git clone <repository-url>
+Download the project files or clone the repository to your local machine.
 
 Alternatively, extract the project folder to a directory, e.g., C:\Users\YourUser\Desktop\project\network traffic problem solve using blockchain.
 5.2. Create a Virtual Environment
-Navigate to the project directory:
-cd C:\Users\YourUser\Desktop\project\network traffic problem solve using blockchain
+Navigate to the project directory
+
 
 Create a virtual environment:
 python -m venv venv
