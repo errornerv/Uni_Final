@@ -1,4 +1,6 @@
 Network Traffic Problem Solve Using Blockchain: Comprehensive Documentation
+
+
 1. Overview
 This project, developed under the supervision of Professor Karimi at Islamic Azad University of Tabriz, provides a blockchain-based solution for managing and optimizing network traffic. By leveraging blockchain technology, machine learning, and intelligent algorithms, the system simulates, analyzes, and manages network traffic with features such as congestion detection, self-healing, resource optimization, predictive analysis, and advanced reporting. The project is authored by Ali Samadian, and all rights are reserved to him.
 The system is modular, with components for blockchain management, traffic analysis, and smart optimization. This document provides a detailed guide on the project’s structure, setup, execution, and usage, focusing on running each script individually.
